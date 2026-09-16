@@ -2,7 +2,7 @@
 
 Python based detection tool combining regex pattern matching and Microsoft Presidio's NLP engine to identify SSNs, credit card numbers, emails, phone numbers, and addresses across document sets, modeling data governance workflows used in e-discovery and compliance.
 
-> **Status:** in progress. Scaffold (Phase 1) and the synthetic corpus with its ground-truth answer key (Phase 2) are complete; detection, parsing, scoring, CLI, and UI are still being built.
+> **Status:** in progress. Scaffold (Phase 1), the synthetic corpus and answer key (Phase 2), and the regex detection baseline (Phase 3) are complete; NLP detection, parsing, risk scoring, CLI, and UI are still being built.
 
 ## Planned capabilities
 
@@ -43,15 +43,58 @@ Sensitive-Data-Discovery-Tool/
 ├── src/
 │   ├── detectors/        # regex + Presidio detection engines
 │   ├── parsers/          # per-format text extraction
-│   └── reporting/        # risk scoring and report building
+│   ├── reporting/        # risk scoring and report building
+│   └── evaluation.py     # precision/recall against the answer key
 ├── scripts/
-│   └── generate_test_data.py
+│   ├── generate_test_data.py
+│   └── score_detector.py
 ├── tests/
 ├── app.py                # Streamlit entry point
 ├── main.py               # CLI entry point
 ├── requirements.txt
 └── README.md
 ```
+
+## Detection
+
+The regex baseline covers identifiers with fixed structure:
+
+| Type | Notes |
+|---|---|
+| `US_SSN` | Encodes the real issuance rules — areas `000`, `666`, `900–999`, group `00` and serial `0000` are never issued |
+| `CREDIT_CARD` | Structural match, then a Luhn checksum. The checksum is what rejects sixteen-digit order numbers |
+| `EMAIL_ADDRESS` | Pragmatic pattern, not full RFC 5322 |
+| `PHONE_NUMBER` | Three common US formats: `(555) 123-4567`, `555-123-4567`, `555.123.4567` |
+| `IP_ADDRESS` | Octets validated `0–255` in the pattern |
+
+`PERSON` and `LOCATION` are deliberately absent — they are defined by context, not shape, and no character pattern can separate a surname from a place name. Phase 4 adds them via Presidio.
+
+Matches never carry the raw matched text. `Match` holds the type, the span, and a masked preview (`***-**-0035`), so a scan log does not become a second copy of the data.
+
+### Scoring
+
+```bash
+python scripts/score_detector.py    # precision / recall table
+python -m pytest tests/             # unit + corpus tests
+```
+
+Current baseline, all 14 corpus files:
+
+```
+TYPE              FOUND  ACTUAL    TP   FP   FN    PREC  RECALL      F1
+CREDIT_CARD           8       8     8    0    0   1.000   1.000   1.000
+EMAIL_ADDRESS        43      43    43    0    0   1.000   1.000   1.000
+IP_ADDRESS           10       5     5    5    0   0.500   1.000   0.667
+PHONE_NUMBER         35      35    35    0    0   1.000   1.000   1.000
+US_SSN               35      35    35    0    0   1.000   1.000   1.000
+ALL                 131     126   126    5    0   0.962   1.000   0.981
+```
+
+**The IP score is the interesting one.** Five false positives, all on the planted version strings like `10.2.14.3`. The pattern is not wrong — that is a syntactically valid address — it simply cannot see that the sentence is about a software build. Separating the two requires context, which is precisely what the NLP layer in Phase 4 is for. That gap is the reason regex comes first: it makes the improvement measurable rather than assumed.
+
+### What these numbers do not mean
+
+The phone patterns cover three formats because the corpus contains three. Real-world phone detection also faces country codes, extensions, and international formats. Recall of 1.000 here means "found everything in a corpus built from these formats", not "solved phone detection".
 
 ## Test data and the answer key
 
