@@ -1,4 +1,10 @@
-# Phase 1 dependencies. Later phases add presidio-analyzer, presidio-anonymizer,
-# pdfplumber, python-docx, and streamlit.
-faker
-pandas
+# Versions are pinned so the synthetic corpus in data/raw/ stays byte-identical
+# across machines and over time. The answer key records character offsets, which
+# are only valid for the exact text Faker produced -- an unpinned upgrade would
+# silently invalidate every offset. Upgrade deliberately, then regenerate the
+# corpus and the key together.
+#
+# Later phases add presidio-analyzer, presidio-anonymizer, pdfplumber,
+# python-docx, and streamlit.
+faker==40.39.0
+pandas==3.0.5

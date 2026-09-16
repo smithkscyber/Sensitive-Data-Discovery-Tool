@@ -1,0 +1,30 @@
+INTERNAL MEMORANDUM
+============================================================
+
+To:      Joy Salas <mcculloughkaren@example.net>
+From:    Jessica Raymond
+Subject: Account access review
+Ref:     INC-669709016
+
+Joy Salas,
+
+Following up on the item we discussed. The employee record in
+question lists a home address of 33702 Colton Dale Apt. 826, West Kimberlyport, SC 47791,
+which does not match what payroll has on file. Their taxpayer
+identifier on the submitted form reads 799-19-4950.
+
+Please confirm by phone at (614) 330-7939 before Friday, or
+reply to garciacolleen@example.net if that is easier.
+
+The reimbursement was charged to the corporate card ending in
+the account below; finance has asked that we stop circulating it
+in plain text after this thread.
+
+    Card: 4679-4073-3639-3078
+
+For the audit trail, the request originated from the workstation at
+    192.168.213.114
+running client build 10.2.14.3.
+
+Thanks,
+Jessica Raymond

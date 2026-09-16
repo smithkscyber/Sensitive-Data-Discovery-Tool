@@ -1,0 +1,1800 @@
+{
+  "schema_version": 1,
+  "generator": {
+    "script": "scripts/generate_test_data.py",
+    "seed": 20260916,
+    "faker_version": "40.39.0",
+    "python_version": "3.11"
+  },
+  "conventions": {
+    "offsets": "Character indices into the UTF-8 decoded file text, half-open [start, end), matching Python slicing and re spans.",
+    "values": "Included because scoring needs them and every value here is synthetic. Detector output must still redact -- see README.",
+    "decoys": "Values that resemble PII but are not sensitive. A detector that flags one has produced a false positive.",
+    "matching": "Prefer overlap-based matching over exact spans. Presidio may bound a PERSON or LOCATION differently than the generator did.",
+    "determinism": "No wall-clock timestamp is recorded, so this file changes only when the corpus itself changes."
+  },
+  "summary": {
+    "file_count": 14,
+    "finding_count": 223,
+    "decoy_count": 40,
+    "findings_by_type": {
+      "CREDIT_CARD": 8,
+      "EMAIL_ADDRESS": 43,
+      "IP_ADDRESS": 5,
+      "LOCATION": 35,
+      "PERSON": 62,
+      "PHONE_NUMBER": 35,
+      "US_SSN": 35
+    }
+  },
+  "files": [
+    {
+      "path": "data/raw/memo_01.txt",
+      "format": "txt",
+      "text_sha256": "5c3773397c9d986653bd34181d8667ef300bcdf9bffe6afcbd91406283f51b69",
+      "findings": [
+        {
+          "type": "PERSON",
+          "start": 91,
+          "end": 105,
+          "value": "Elaine Fleming"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 107,
+          "end": 127,
+          "value": "woodjohn@example.net"
+        },
+        {
+          "type": "PERSON",
+          "start": 138,
+          "end": 148,
+          "value": "Sheri Berg"
+        },
+        {
+          "type": "PERSON",
+          "start": 204,
+          "end": 218,
+          "value": "Elaine Fleming"
+        },
+        {
+          "type": "LOCATION",
+          "start": 316,
+          "end": 362,
+          "value": "998 John Mews Suite 876, Schmidtfurt, PW 17264"
+        },
+        {
+          "type": "US_SSN",
+          "start": 465,
+          "end": 476,
+          "value": "767-63-0758"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 506,
+          "end": 518,
+          "value": "591-362-1778"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 546,
+          "end": 571,
+          "value": "malloryarroyo@example.com"
+        },
+        {
+          "type": "IP_ADDRESS",
+          "start": 664,
+          "end": 678,
+          "value": "192.168.245.82"
+        },
+        {
+          "type": "PERSON",
+          "start": 720,
+          "end": 730,
+          "value": "Sheri Berg"
+        }
+      ],
+      "decoys": [
+        {
+          "near_miss_for": "US_SSN",
+          "start": 193,
+          "end": 202,
+          "value": "832856273",
+          "reason": "internal incident number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "IP_ADDRESS",
+          "start": 700,
+          "end": 709,
+          "value": "10.2.14.3",
+          "reason": "software version string in dotted-quad form, not a network address"
+        }
+      ]
+    },
+    {
+      "path": "data/raw/memo_02.txt",
+      "format": "txt",
+      "text_sha256": "8ceb649ace3452a7dfb150324579f8263fb3ce8602ce1a481bdc8de1cdd240c6",
+      "findings": [
+        {
+          "type": "PERSON",
+          "start": 91,
+          "end": 102,
+          "value": "James Heath"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 104,
+          "end": 126,
+          "value": "veronica74@example.com"
+        },
+        {
+          "type": "PERSON",
+          "start": 137,
+          "end": 148,
+          "value": "Stacey Diaz"
+        },
+        {
+          "type": "PERSON",
+          "start": 212,
+          "end": 223,
+          "value": "James Heath"
+        },
+        {
+          "type": "LOCATION",
+          "start": 321,
+          "end": 360,
+          "value": "8941 Brian Ports, West Bianca, MH 17414"
+        },
+        {
+          "type": "US_SSN",
+          "start": 463,
+          "end": 474,
+          "value": "019-72-1546"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 504,
+          "end": 516,
+          "value": "980.804.7175"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 544,
+          "end": 571,
+          "value": "petersonjeffrey@example.org"
+        },
+        {
+          "type": "CREDIT_CARD",
+          "start": 763,
+          "end": 782,
+          "value": "4720 0566 5876 3761"
+        },
+        {
+          "type": "IP_ADDRESS",
+          "start": 856,
+          "end": 869,
+          "value": "10.235.204.93"
+        },
+        {
+          "type": "PERSON",
+          "start": 911,
+          "end": 922,
+          "value": "Stacey Diaz"
+        }
+      ],
+      "decoys": [
+        {
+          "near_miss_for": "US_SSN",
+          "start": 201,
+          "end": 210,
+          "value": "359021172",
+          "reason": "internal incident number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "IP_ADDRESS",
+          "start": 891,
+          "end": 900,
+          "value": "10.2.14.3",
+          "reason": "software version string in dotted-quad form, not a network address"
+        }
+      ]
+    },
+    {
+      "path": "data/raw/memo_03.txt",
+      "format": "txt",
+      "text_sha256": "3d0f46037c53b78e1c2484dab1c9d735b715a88804ac167dbcbb61d1406fc255",
+      "findings": [
+        {
+          "type": "PERSON",
+          "start": 91,
+          "end": 107,
+          "value": "Stacey Gutierrez"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 109,
+          "end": 134,
+          "value": "colleenwilson@example.com"
+        },
+        {
+          "type": "PERSON",
+          "start": 145,
+          "end": 157,
+          "value": "Joshua Davis"
+        },
+        {
+          "type": "PERSON",
+          "start": 219,
+          "end": 235,
+          "value": "Stacey Gutierrez"
+        },
+        {
+          "type": "LOCATION",
+          "start": 333,
+          "end": 374,
+          "value": "3592 Darren Locks, West Shannon, NY 97982"
+        },
+        {
+          "type": "US_SSN",
+          "start": 477,
+          "end": 488,
+          "value": "317-84-6500"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 518,
+          "end": 530,
+          "value": "475-753-7427"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 558,
+          "end": 579,
+          "value": "dcardenas@example.org"
+        },
+        {
+          "type": "IP_ADDRESS",
+          "start": 672,
+          "end": 685,
+          "value": "172.31.114.91"
+        },
+        {
+          "type": "PERSON",
+          "start": 727,
+          "end": 739,
+          "value": "Joshua Davis"
+        }
+      ],
+      "decoys": [
+        {
+          "near_miss_for": "US_SSN",
+          "start": 208,
+          "end": 217,
+          "value": "567917269",
+          "reason": "internal incident number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "IP_ADDRESS",
+          "start": 707,
+          "end": 716,
+          "value": "10.2.14.3",
+          "reason": "software version string in dotted-quad form, not a network address"
+        }
+      ]
+    },
+    {
+      "path": "data/raw/memo_04.txt",
+      "format": "txt",
+      "text_sha256": "b43da312b8c05d27f8c47ce320755ce7dc44bfa53be1f3eee59755cbfb52baba",
+      "findings": [
+        {
+          "type": "PERSON",
+          "start": 91,
+          "end": 100,
+          "value": "Joy Salas"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 102,
+          "end": 129,
+          "value": "mcculloughkaren@example.net"
+        },
+        {
+          "type": "PERSON",
+          "start": 140,
+          "end": 155,
+          "value": "Jessica Raymond"
+        },
+        {
+          "type": "PERSON",
+          "start": 211,
+          "end": 220,
+          "value": "Joy Salas"
+        },
+        {
+          "type": "LOCATION",
+          "start": 318,
+          "end": 373,
+          "value": "33702 Colton Dale Apt. 826, West Kimberlyport, SC 47791"
+        },
+        {
+          "type": "US_SSN",
+          "start": 476,
+          "end": 487,
+          "value": "799-19-4950"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 517,
+          "end": 531,
+          "value": "(614) 330-7939"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 559,
+          "end": 584,
+          "value": "garciacolleen@example.net"
+        },
+        {
+          "type": "CREDIT_CARD",
+          "start": 776,
+          "end": 795,
+          "value": "4679-4073-3639-3078"
+        },
+        {
+          "type": "IP_ADDRESS",
+          "start": 869,
+          "end": 884,
+          "value": "192.168.213.114"
+        },
+        {
+          "type": "PERSON",
+          "start": 926,
+          "end": 941,
+          "value": "Jessica Raymond"
+        }
+      ],
+      "decoys": [
+        {
+          "near_miss_for": "US_SSN",
+          "start": 200,
+          "end": 209,
+          "value": "669709016",
+          "reason": "internal incident number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "IP_ADDRESS",
+          "start": 906,
+          "end": 915,
+          "value": "10.2.14.3",
+          "reason": "software version string in dotted-quad form, not a network address"
+        }
+      ]
+    },
+    {
+      "path": "data/raw/memo_05.txt",
+      "format": "txt",
+      "text_sha256": "472934f654e672ed8572cac27ecde3e7e36d750e51ed1b14bbc4e8ceb4c0e321",
+      "findings": [
+        {
+          "type": "PERSON",
+          "start": 91,
+          "end": 105,
+          "value": "Jennifer Brown"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 107,
+          "end": 128,
+          "value": "rmartinez@example.org"
+        },
+        {
+          "type": "PERSON",
+          "start": 139,
+          "end": 151,
+          "value": "David Newman"
+        },
+        {
+          "type": "PERSON",
+          "start": 215,
+          "end": 229,
+          "value": "Jennifer Brown"
+        },
+        {
+          "type": "LOCATION",
+          "start": 327,
+          "end": 378,
+          "value": "115 Gray River Suite 003, South Coreyside, NH 89950"
+        },
+        {
+          "type": "US_SSN",
+          "start": 481,
+          "end": 492,
+          "value": "331-65-2570"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 522,
+          "end": 536,
+          "value": "(896) 742-7850"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 564,
+          "end": 584,
+          "value": "wgoodwin@example.net"
+        },
+        {
+          "type": "IP_ADDRESS",
+          "start": 677,
+          "end": 690,
+          "value": "192.168.72.41"
+        },
+        {
+          "type": "PERSON",
+          "start": 732,
+          "end": 744,
+          "value": "David Newman"
+        }
+      ],
+      "decoys": [
+        {
+          "near_miss_for": "US_SSN",
+          "start": 204,
+          "end": 213,
+          "value": "422324870",
+          "reason": "internal incident number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "IP_ADDRESS",
+          "start": 712,
+          "end": 721,
+          "value": "10.2.14.3",
+          "reason": "software version string in dotted-quad form, not a network address"
+        }
+      ]
+    },
+    {
+      "path": "data/raw/contacts_01.csv",
+      "format": "csv",
+      "text_sha256": "7da61a38bcfabee96a618afa16401bd12daebed3d6329ac393bdf5a2d8fc6fd1",
+      "findings": [
+        {
+          "type": "PERSON",
+          "start": 46,
+          "end": 57,
+          "value": "Daniel Koch"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 58,
+          "end": 80,
+          "value": "tcontreras@example.com"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 81,
+          "end": 93,
+          "value": "231-277-0794"
+        },
+        {
+          "type": "LOCATION",
+          "start": 95,
+          "end": 146,
+          "value": "516 Patricia Courts Suite 234, Robertstad, FM 03592"
+        },
+        {
+          "type": "US_SSN",
+          "start": 148,
+          "end": 159,
+          "value": "488-14-1361"
+        },
+        {
+          "type": "PERSON",
+          "start": 170,
+          "end": 189,
+          "value": "Christopher Wheeler"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 190,
+          "end": 208,
+          "value": "mary85@example.org"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 209,
+          "end": 221,
+          "value": "532-688-4251"
+        },
+        {
+          "type": "LOCATION",
+          "start": 223,
+          "end": 278,
+          "value": "09731 Ware Motorway Suite 704, North Danielle, AS 45143"
+        },
+        {
+          "type": "US_SSN",
+          "start": 280,
+          "end": 291,
+          "value": "493-03-7461"
+        },
+        {
+          "type": "PERSON",
+          "start": 302,
+          "end": 318,
+          "value": "Howard Hernandez"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 319,
+          "end": 342,
+          "value": "blackdennis@example.net"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 343,
+          "end": 355,
+          "value": "250.657.8747"
+        },
+        {
+          "type": "LOCATION",
+          "start": 357,
+          "end": 411,
+          "value": "71501 Makayla Bridge Suite 363, East Michael, AS 81752"
+        },
+        {
+          "type": "US_SSN",
+          "start": 413,
+          "end": 424,
+          "value": "798-80-8388"
+        },
+        {
+          "type": "PERSON",
+          "start": 435,
+          "end": 447,
+          "value": "Kelsey Price"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 448,
+          "end": 465,
+          "value": "opena@example.com"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 466,
+          "end": 480,
+          "value": "(919) 325-1909"
+        },
+        {
+          "type": "LOCATION",
+          "start": 482,
+          "end": 521,
+          "value": "118 Robert Gateway, Brianfurt, GA 22431"
+        },
+        {
+          "type": "US_SSN",
+          "start": 523,
+          "end": 534,
+          "value": "810-34-7354"
+        },
+        {
+          "type": "PERSON",
+          "start": 545,
+          "end": 561,
+          "value": "Kristopher Perez"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 562,
+          "end": 584,
+          "value": "duncanjohn@example.net"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 585,
+          "end": 597,
+          "value": "790-836-3534"
+        },
+        {
+          "type": "LOCATION",
+          "start": 599,
+          "end": 650,
+          "value": "96354 Calderon Underpass, West Elainebury, HI 31859"
+        },
+        {
+          "type": "US_SSN",
+          "start": 652,
+          "end": 663,
+          "value": "417-46-3916"
+        },
+        {
+          "type": "PERSON",
+          "start": 674,
+          "end": 687,
+          "value": "Matthew Jones"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 688,
+          "end": 708,
+          "value": "andrew71@example.org"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 709,
+          "end": 721,
+          "value": "705.332.0290"
+        },
+        {
+          "type": "LOCATION",
+          "start": 723,
+          "end": 767,
+          "value": "73927 Tyler Knoll, Nicholasborough, CO 73384"
+        },
+        {
+          "type": "US_SSN",
+          "start": 769,
+          "end": 780,
+          "value": "840-73-8582"
+        },
+        {
+          "type": "PERSON",
+          "start": 791,
+          "end": 805,
+          "value": "Jennifer Heath"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 806,
+          "end": 827,
+          "value": "wwilliams@example.com"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 828,
+          "end": 840,
+          "value": "277.548.3639"
+        },
+        {
+          "type": "LOCATION",
+          "start": 842,
+          "end": 894,
+          "value": "24157 James Locks Suite 502, Michellehaven, CT 14028"
+        },
+        {
+          "type": "US_SSN",
+          "start": 896,
+          "end": 907,
+          "value": "856-13-8509"
+        },
+        {
+          "type": "PERSON",
+          "start": 918,
+          "end": 933,
+          "value": "Jason Schroeder"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 934,
+          "end": 960,
+          "value": "jacquelinewall@example.net"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 961,
+          "end": 973,
+          "value": "876.370.7867"
+        },
+        {
+          "type": "LOCATION",
+          "start": 975,
+          "end": 1027,
+          "value": "595 Ryan Fords Suite 285, Lake Chelseaside, NE 16101"
+        },
+        {
+          "type": "US_SSN",
+          "start": 1029,
+          "end": 1040,
+          "value": "677-43-7860"
+        }
+      ],
+      "decoys": [
+        {
+          "near_miss_for": "US_SSN",
+          "start": 160,
+          "end": 169,
+          "value": "126585349",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 292,
+          "end": 301,
+          "value": "752704152",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 425,
+          "end": 434,
+          "value": "425782167",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 535,
+          "end": 544,
+          "value": "905524610",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 664,
+          "end": 673,
+          "value": "723923820",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 781,
+          "end": 790,
+          "value": "201277390",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 908,
+          "end": 917,
+          "value": "226346774",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 1041,
+          "end": 1050,
+          "value": "278089889",
+          "reason": "payroll employee number, nine digits with no separators"
+        }
+      ]
+    },
+    {
+      "path": "data/raw/contacts_02.csv",
+      "format": "csv",
+      "text_sha256": "39c6118b053fc6824f5c35651aff285a5846b0678390d256e8be5de295108676",
+      "findings": [
+        {
+          "type": "PERSON",
+          "start": 46,
+          "end": 58,
+          "value": "Paul Wheeler"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 59,
+          "end": 83,
+          "value": "ronaldpalmer@example.net"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 84,
+          "end": 96,
+          "value": "208-258-5794"
+        },
+        {
+          "type": "LOCATION",
+          "start": 98,
+          "end": 137,
+          "value": "0780 Theresa Run, Richardfort, VT 27508"
+        },
+        {
+          "type": "US_SSN",
+          "start": 139,
+          "end": 150,
+          "value": "197-44-2120"
+        },
+        {
+          "type": "PERSON",
+          "start": 161,
+          "end": 174,
+          "value": "Joseph Krause"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 175,
+          "end": 199,
+          "value": "timothydavis@example.com"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 200,
+          "end": 212,
+          "value": "578-757-7334"
+        },
+        {
+          "type": "LOCATION",
+          "start": 214,
+          "end": 268,
+          "value": "21682 Avery Station Suite 246, West Garyport, SD 70183"
+        },
+        {
+          "type": "US_SSN",
+          "start": 270,
+          "end": 281,
+          "value": "271-89-4313"
+        },
+        {
+          "type": "PERSON",
+          "start": 292,
+          "end": 305,
+          "value": "Jennifer Chen"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 306,
+          "end": 328,
+          "value": "donnabaker@example.net"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 329,
+          "end": 341,
+          "value": "649.593.2461"
+        },
+        {
+          "type": "LOCATION",
+          "start": 343,
+          "end": 390,
+          "value": "094 Jonathan Causeway, Alexandermouth, CT 86559"
+        },
+        {
+          "type": "US_SSN",
+          "start": 392,
+          "end": 403,
+          "value": "431-94-9189"
+        },
+        {
+          "type": "PERSON",
+          "start": 414,
+          "end": 427,
+          "value": "Richard Moyer"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 428,
+          "end": 447,
+          "value": "jorge72@example.net"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 448,
+          "end": 460,
+          "value": "844-671-7766"
+        },
+        {
+          "type": "LOCATION",
+          "start": 462,
+          "end": 501,
+          "value": "016 Katie Roads, Melissaville, LA 66552"
+        },
+        {
+          "type": "US_SSN",
+          "start": 503,
+          "end": 514,
+          "value": "041-71-6121"
+        },
+        {
+          "type": "PERSON",
+          "start": 525,
+          "end": 538,
+          "value": "Shelley Baker"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 539,
+          "end": 558,
+          "value": "brian67@example.com"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 559,
+          "end": 571,
+          "value": "485.298.2939"
+        },
+        {
+          "type": "LOCATION",
+          "start": 573,
+          "end": 621,
+          "value": "9389 Ashley Burgs Suite 486, Graceberg, NJ 85801"
+        },
+        {
+          "type": "US_SSN",
+          "start": 623,
+          "end": 634,
+          "value": "371-57-9918"
+        },
+        {
+          "type": "PERSON",
+          "start": 645,
+          "end": 657,
+          "value": "Pamela Lewis"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 658,
+          "end": 678,
+          "value": "daniel72@example.org"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 679,
+          "end": 693,
+          "value": "(317) 760-7952"
+        },
+        {
+          "type": "LOCATION",
+          "start": 695,
+          "end": 736,
+          "value": "424 Robinson Coves, Sabrinastad, AR 73492"
+        },
+        {
+          "type": "US_SSN",
+          "start": 738,
+          "end": 749,
+          "value": "111-85-7415"
+        },
+        {
+          "type": "PERSON",
+          "start": 760,
+          "end": 774,
+          "value": "Willie Douglas"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 775,
+          "end": 798,
+          "value": "elizabeth73@example.com"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 799,
+          "end": 811,
+          "value": "960.403.5378"
+        },
+        {
+          "type": "LOCATION",
+          "start": 813,
+          "end": 856,
+          "value": "58580 Miller Valleys, Dorseyhaven, MA 99540"
+        },
+        {
+          "type": "US_SSN",
+          "start": 858,
+          "end": 869,
+          "value": "734-28-1796"
+        },
+        {
+          "type": "PERSON",
+          "start": 880,
+          "end": 893,
+          "value": "Jeffrey Rojas"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 894,
+          "end": 913,
+          "value": "jimmy84@example.net"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 914,
+          "end": 928,
+          "value": "(939) 955-2916"
+        },
+        {
+          "type": "LOCATION",
+          "start": 930,
+          "end": 971,
+          "value": "89405 Beverly Ramp, Johnsonview, NE 46156"
+        },
+        {
+          "type": "US_SSN",
+          "start": 973,
+          "end": 984,
+          "value": "670-27-0898"
+        }
+      ],
+      "decoys": [
+        {
+          "near_miss_for": "US_SSN",
+          "start": 151,
+          "end": 160,
+          "value": "513834974",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 282,
+          "end": 291,
+          "value": "311838884",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 404,
+          "end": 413,
+          "value": "886333935",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 515,
+          "end": 524,
+          "value": "292546816",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 635,
+          "end": 644,
+          "value": "127246568",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 750,
+          "end": 759,
+          "value": "384447644",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 870,
+          "end": 879,
+          "value": "811442330",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 985,
+          "end": 994,
+          "value": "224847156",
+          "reason": "payroll employee number, nine digits with no separators"
+        }
+      ]
+    },
+    {
+      "path": "data/raw/contacts_03.csv",
+      "format": "csv",
+      "text_sha256": "437458128f50576fc2388fa80983f8c644ecc9211c65581e0ba13f24057b6910",
+      "findings": [
+        {
+          "type": "PERSON",
+          "start": 46,
+          "end": 60,
+          "value": "Benjamin Myers"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 61,
+          "end": 82,
+          "value": "lowesusan@example.com"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 83,
+          "end": 95,
+          "value": "604-788-2211"
+        },
+        {
+          "type": "LOCATION",
+          "start": 97,
+          "end": 139,
+          "value": "446 Jessica Islands, Sanchezberg, AL 51869"
+        },
+        {
+          "type": "US_SSN",
+          "start": 141,
+          "end": 152,
+          "value": "839-69-7458"
+        },
+        {
+          "type": "PERSON",
+          "start": 163,
+          "end": 174,
+          "value": "Lori Larson"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 175,
+          "end": 193,
+          "value": "john99@example.com"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 194,
+          "end": 206,
+          "value": "258.727.5067"
+        },
+        {
+          "type": "LOCATION",
+          "start": 208,
+          "end": 253,
+          "value": "7559 Katherine Summit, Port Jessica, AK 67193"
+        },
+        {
+          "type": "US_SSN",
+          "start": 255,
+          "end": 266,
+          "value": "541-39-7884"
+        },
+        {
+          "type": "PERSON",
+          "start": 277,
+          "end": 292,
+          "value": "Tracey Gonzales"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 293,
+          "end": 311,
+          "value": "hklein@example.com"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 312,
+          "end": 324,
+          "value": "606-694-8496"
+        },
+        {
+          "type": "LOCATION",
+          "start": 326,
+          "end": 369,
+          "value": "7620 Christina Orchard, Smithport, OK 38671"
+        },
+        {
+          "type": "US_SSN",
+          "start": 371,
+          "end": 382,
+          "value": "667-23-3796"
+        },
+        {
+          "type": "PERSON",
+          "start": 393,
+          "end": 405,
+          "value": "Isaac Landry"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 406,
+          "end": 434,
+          "value": "fernandezwilliam@example.org"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 435,
+          "end": 447,
+          "value": "602.486.7908"
+        },
+        {
+          "type": "LOCATION",
+          "start": 449,
+          "end": 502,
+          "value": "623 Miranda Street Suite 352, South Bethany, VT 37776"
+        },
+        {
+          "type": "US_SSN",
+          "start": 504,
+          "end": 515,
+          "value": "709-53-9791"
+        },
+        {
+          "type": "PERSON",
+          "start": 526,
+          "end": 536,
+          "value": "Neil Smith"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 537,
+          "end": 555,
+          "value": "zpayne@example.net"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 556,
+          "end": 570,
+          "value": "(723) 950-1429"
+        },
+        {
+          "type": "LOCATION",
+          "start": 572,
+          "end": 614,
+          "value": "8349 Sharon Lights, East Bethton, FM 94331"
+        },
+        {
+          "type": "US_SSN",
+          "start": 616,
+          "end": 627,
+          "value": "562-93-9617"
+        },
+        {
+          "type": "PERSON",
+          "start": 638,
+          "end": 652,
+          "value": "Jessica Morton"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 653,
+          "end": 675,
+          "value": "diazsydney@example.net"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 676,
+          "end": 688,
+          "value": "944.971.5774"
+        },
+        {
+          "type": "LOCATION",
+          "start": 690,
+          "end": 740,
+          "value": "038 Jared Extensions Apt. 006, Brownberg, DC 64087"
+        },
+        {
+          "type": "US_SSN",
+          "start": 742,
+          "end": 753,
+          "value": "684-61-7612"
+        },
+        {
+          "type": "PERSON",
+          "start": 764,
+          "end": 777,
+          "value": "John Williams"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 778,
+          "end": 795,
+          "value": "xrios@example.com"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 796,
+          "end": 808,
+          "value": "354-448-3895"
+        },
+        {
+          "type": "LOCATION",
+          "start": 810,
+          "end": 860,
+          "value": "3125 Joshua Divide Apt. 554, Port Regina, NC 00586"
+        },
+        {
+          "type": "US_SSN",
+          "start": 862,
+          "end": 873,
+          "value": "889-37-9647"
+        },
+        {
+          "type": "PERSON",
+          "start": 884,
+          "end": 896,
+          "value": "Tamara Baker"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 897,
+          "end": 922,
+          "value": "kristinabryan@example.net"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 923,
+          "end": 935,
+          "value": "949.215.2124"
+        },
+        {
+          "type": "LOCATION",
+          "start": 937,
+          "end": 987,
+          "value": "8799 Sonya Keys Suite 151, North Abigail, PA 88301"
+        },
+        {
+          "type": "US_SSN",
+          "start": 989,
+          "end": 1000,
+          "value": "043-77-9369"
+        }
+      ],
+      "decoys": [
+        {
+          "near_miss_for": "US_SSN",
+          "start": 153,
+          "end": 162,
+          "value": "585478101",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 267,
+          "end": 276,
+          "value": "820931586",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 383,
+          "end": 392,
+          "value": "189605482",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 516,
+          "end": 525,
+          "value": "102614427",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 628,
+          "end": 637,
+          "value": "151660744",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 754,
+          "end": 763,
+          "value": "573201546",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 874,
+          "end": 883,
+          "value": "935484089",
+          "reason": "payroll employee number, nine digits with no separators"
+        },
+        {
+          "near_miss_for": "US_SSN",
+          "start": 1001,
+          "end": 1010,
+          "value": "981070449",
+          "reason": "payroll employee number, nine digits with no separators"
+        }
+      ]
+    },
+    {
+      "path": "data/pending/contract_01.txt",
+      "format": "txt",
+      "text_sha256": "d5447ef7fd57bb10311e832919a2bf8e93c8fc6dd56578af312387adcd275b2a",
+      "findings": [
+        {
+          "type": "PERSON",
+          "start": 107,
+          "end": 119,
+          "value": "Karen Harper"
+        },
+        {
+          "type": "LOCATION",
+          "start": 144,
+          "end": 184,
+          "value": "35784 Flowers Shoal, Allentown, NH 40196"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 241,
+          "end": 261,
+          "value": "ronald67@example.com"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 294,
+          "end": 308,
+          "value": "(435) 299-1581"
+        },
+        {
+          "type": "CREDIT_CARD",
+          "start": 415,
+          "end": 431,
+          "value": "4586582232061284"
+        },
+        {
+          "type": "US_SSN",
+          "start": 605,
+          "end": 616,
+          "value": "179-63-4152"
+        },
+        {
+          "type": "PERSON",
+          "start": 684,
+          "end": 696,
+          "value": "Karen Harper"
+        },
+        {
+          "type": "PERSON",
+          "start": 706,
+          "end": 718,
+          "value": "Ashley Brown"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 728,
+          "end": 754,
+          "value": "kennethnichols@example.org"
+        }
+      ],
+      "decoys": [
+        {
+          "near_miss_for": "CREDIT_CARD",
+          "start": 470,
+          "end": 486,
+          "value": "4662375108675134",
+          "reason": "sixteen-digit purchase order that fails the Luhn checksum"
+        }
+      ],
+      "pending_conversion": {
+        "target_format": "docx",
+        "note": "Offsets are valid for this source text. Converting to docx changes the extracted layout, so Phase 5 must re-derive offsets against the extracted text."
+      }
+    },
+    {
+      "path": "data/pending/contract_02.txt",
+      "format": "txt",
+      "text_sha256": "628f8560348149b5490e93baa28f9babf62f8f318c21a857fc6feb84af1d882c",
+      "findings": [
+        {
+          "type": "PERSON",
+          "start": 107,
+          "end": 118,
+          "value": "Nancy Lopez"
+        },
+        {
+          "type": "LOCATION",
+          "start": 143,
+          "end": 194,
+          "value": "28235 Nicole Shoal Suite 121, Lake Pamela, MD 81313"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 251,
+          "end": 274,
+          "value": "browndebbie@example.org"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 307,
+          "end": 319,
+          "value": "967-884-0528"
+        },
+        {
+          "type": "CREDIT_CARD",
+          "start": 426,
+          "end": 445,
+          "value": "4411-4587-3712-3443"
+        },
+        {
+          "type": "US_SSN",
+          "start": 619,
+          "end": 630,
+          "value": "534-45-1329"
+        },
+        {
+          "type": "PERSON",
+          "start": 698,
+          "end": 709,
+          "value": "Nancy Lopez"
+        },
+        {
+          "type": "PERSON",
+          "start": 719,
+          "end": 734,
+          "value": "Miranda Robbins"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 744,
+          "end": 767,
+          "value": "georgebrown@example.org"
+        }
+      ],
+      "decoys": [
+        {
+          "near_miss_for": "CREDIT_CARD",
+          "start": 484,
+          "end": 500,
+          "value": "4249772561321077",
+          "reason": "sixteen-digit purchase order that fails the Luhn checksum"
+        }
+      ],
+      "pending_conversion": {
+        "target_format": "docx",
+        "note": "Offsets are valid for this source text. Converting to docx changes the extracted layout, so Phase 5 must re-derive offsets against the extracted text."
+      }
+    },
+    {
+      "path": "data/pending/contract_03.txt",
+      "format": "txt",
+      "text_sha256": "69b62dc9b59eb9efc7b552eef18c6e4622fb1ba4349b315222bbf64fc068bfd1",
+      "findings": [
+        {
+          "type": "PERSON",
+          "start": 107,
+          "end": 114,
+          "value": "Amy Kim"
+        },
+        {
+          "type": "LOCATION",
+          "start": 139,
+          "end": 186,
+          "value": "68088 Rebecca Club Apt. 554, Tarastad, OH 26873"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 243,
+          "end": 263,
+          "value": "bcalhoun@example.net"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 296,
+          "end": 310,
+          "value": "(347) 509-0150"
+        },
+        {
+          "type": "CREDIT_CARD",
+          "start": 417,
+          "end": 433,
+          "value": "4806307856031999"
+        },
+        {
+          "type": "US_SSN",
+          "start": 607,
+          "end": 618,
+          "value": "461-87-2006"
+        },
+        {
+          "type": "PERSON",
+          "start": 686,
+          "end": 693,
+          "value": "Amy Kim"
+        },
+        {
+          "type": "PERSON",
+          "start": 703,
+          "end": 714,
+          "value": "Lisa Kelley"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 724,
+          "end": 743,
+          "value": "zchurch@example.net"
+        }
+      ],
+      "decoys": [
+        {
+          "near_miss_for": "CREDIT_CARD",
+          "start": 472,
+          "end": 488,
+          "value": "7001257417946320",
+          "reason": "sixteen-digit purchase order that fails the Luhn checksum"
+        }
+      ],
+      "pending_conversion": {
+        "target_format": "docx",
+        "note": "Offsets are valid for this source text. Converting to docx changes the extracted layout, so Phase 5 must re-derive offsets against the extracted text."
+      }
+    },
+    {
+      "path": "data/pending/letter_01.txt",
+      "format": "txt",
+      "text_sha256": "c4bbe94e8a3fd7bc7aad61677d221f900bca40051c67ea6e92fbd97a7d4094ad",
+      "findings": [
+        {
+          "type": "PERSON",
+          "start": 53,
+          "end": 69,
+          "value": "Fernando Proctor"
+        },
+        {
+          "type": "LOCATION",
+          "start": 70,
+          "end": 119,
+          "value": "99492 Cheryl Fork Suite 824, South Kyle, HI 56325"
+        },
+        {
+          "type": "PERSON",
+          "start": 126,
+          "end": 142,
+          "value": "Fernando Proctor"
+        },
+        {
+          "type": "CREDIT_CARD",
+          "start": 312,
+          "end": 331,
+          "value": "2247-1285-4294-3970"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 412,
+          "end": 426,
+          "value": "(688) 837-4371"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 439,
+          "end": 465,
+          "value": "fowlerjennifer@example.net"
+        },
+        {
+          "type": "US_SSN",
+          "start": 606,
+          "end": 617,
+          "value": "043-82-0030"
+        },
+        {
+          "type": "PERSON",
+          "start": 666,
+          "end": 678,
+          "value": "Tyler Miller"
+        }
+      ],
+      "decoys": [
+        {
+          "near_miss_for": "US_SSN",
+          "start": 643,
+          "end": 652,
+          "value": "617715113",
+          "reason": "case reference, nine digits with no separators"
+        }
+      ],
+      "pending_conversion": {
+        "target_format": "pdf",
+        "note": "Offsets are valid for this source text. Converting to pdf changes the extracted layout, so Phase 5 must re-derive offsets against the extracted text."
+      }
+    },
+    {
+      "path": "data/pending/letter_02.txt",
+      "format": "txt",
+      "text_sha256": "918ef14bfa7c75e559fe960b72cbc7d380c2d9225814cc26feaf79f9c6a25490",
+      "findings": [
+        {
+          "type": "PERSON",
+          "start": 53,
+          "end": 70,
+          "value": "Stephanie Schultz"
+        },
+        {
+          "type": "LOCATION",
+          "start": 71,
+          "end": 113,
+          "value": "3490 Kimberly Highway, Lake Dean, ID 62495"
+        },
+        {
+          "type": "PERSON",
+          "start": 120,
+          "end": 137,
+          "value": "Stephanie Schultz"
+        },
+        {
+          "type": "CREDIT_CARD",
+          "start": 307,
+          "end": 326,
+          "value": "4027 4077 6879 7274"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 407,
+          "end": 419,
+          "value": "646.426.3364"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 432,
+          "end": 453,
+          "value": "wcummings@example.org"
+        },
+        {
+          "type": "US_SSN",
+          "start": 594,
+          "end": 605,
+          "value": "409-56-5180"
+        },
+        {
+          "type": "PERSON",
+          "start": 654,
+          "end": 667,
+          "value": "Aaron Sherman"
+        }
+      ],
+      "decoys": [
+        {
+          "near_miss_for": "US_SSN",
+          "start": 631,
+          "end": 640,
+          "value": "123290628",
+          "reason": "case reference, nine digits with no separators"
+        }
+      ],
+      "pending_conversion": {
+        "target_format": "pdf",
+        "note": "Offsets are valid for this source text. Converting to pdf changes the extracted layout, so Phase 5 must re-derive offsets against the extracted text."
+      }
+    },
+    {
+      "path": "data/pending/letter_03.txt",
+      "format": "txt",
+      "text_sha256": "d2c88aa0d941e0750ebcccd41f22cf75fe04e76387171b419f55987378061fb8",
+      "findings": [
+        {
+          "type": "PERSON",
+          "start": 53,
+          "end": 67,
+          "value": "Nicole Shields"
+        },
+        {
+          "type": "LOCATION",
+          "start": 68,
+          "end": 120,
+          "value": "6098 Morgan Highway Apt. 295, West Matthew, FM 04670"
+        },
+        {
+          "type": "PERSON",
+          "start": 127,
+          "end": 141,
+          "value": "Nicole Shields"
+        },
+        {
+          "type": "CREDIT_CARD",
+          "start": 311,
+          "end": 327,
+          "value": "2253018099576417"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 408,
+          "end": 422,
+          "value": "(575) 626-2228"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 435,
+          "end": 462,
+          "value": "richardsonsonya@example.net"
+        },
+        {
+          "type": "US_SSN",
+          "start": 603,
+          "end": 614,
+          "value": "390-62-4542"
+        },
+        {
+          "type": "PERSON",
+          "start": 663,
+          "end": 674,
+          "value": "Brandon Lee"
+        }
+      ],
+      "decoys": [
+        {
+          "near_miss_for": "US_SSN",
+          "start": 640,
+          "end": 649,
+          "value": "488197874",
+          "reason": "case reference, nine digits with no separators"
+        }
+      ],
+      "pending_conversion": {
+        "target_format": "pdf",
+        "note": "Offsets are valid for this source text. Converting to pdf changes the extracted layout, so Phase 5 must re-derive offsets against the extracted text."
+      }
+    }
+  ]
+}

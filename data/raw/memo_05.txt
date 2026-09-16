@@ -1,0 +1,24 @@
+INTERNAL MEMORANDUM
+============================================================
+
+To:      Jennifer Brown <rmartinez@example.org>
+From:    David Newman
+Subject: Expense reimbursement backlog
+Ref:     INC-422324870
+
+Jennifer Brown,
+
+Following up on the item we discussed. The employee record in
+question lists a home address of 115 Gray River Suite 003, South Coreyside, NH 89950,
+which does not match what payroll has on file. Their taxpayer
+identifier on the submitted form reads 331-65-2570.
+
+Please confirm by phone at (896) 742-7850 before Friday, or
+reply to wgoodwin@example.net if that is easier.
+
+For the audit trail, the request originated from the workstation at
+    192.168.72.41
+running client build 10.2.14.3.
+
+Thanks,
+David Newman

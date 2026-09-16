@@ -1,0 +1,27 @@
+SERVICES AGREEMENT
+
+This Agreement is entered into by and between Northgate Analytics
+LLC ("Provider") and Nancy Lopez ("Client"), residing at
+28235 Nicole Shoal Suite 121, Lake Pamela, MD 81313.
+
+1. NOTICES
+
+   All notices to Client shall be sent to browndebbie@example.org
+   or delivered by telephone to 967-884-0528.
+
+2. PAYMENT
+
+   Client authorizes recurring charges to the payment instrument
+   on file, account number 4411-4587-3712-3443.
+   Invoices reference purchase order 4249772561321077.
+
+3. TAX REPORTING
+
+   Client certifies that the taxpayer identification number
+   provided for reporting purposes is 534-45-1329.
+
+IN WITNESS WHEREOF, the parties execute this Agreement.
+
+Client: Nancy Lopez
+Counsel: Miranda Robbins
+Contact: georgebrown@example.org

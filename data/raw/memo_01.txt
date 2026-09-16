@@ -1,0 +1,24 @@
+INTERNAL MEMORANDUM
+============================================================
+
+To:      Elaine Fleming <woodjohn@example.net>
+From:    Sheri Berg
+Subject: Q3 payroll correction
+Ref:     INC-832856273
+
+Elaine Fleming,
+
+Following up on the item we discussed. The employee record in
+question lists a home address of 998 John Mews Suite 876, Schmidtfurt, PW 17264,
+which does not match what payroll has on file. Their taxpayer
+identifier on the submitted form reads 767-63-0758.
+
+Please confirm by phone at 591-362-1778 before Friday, or
+reply to malloryarroyo@example.com if that is easier.
+
+For the audit trail, the request originated from the workstation at
+    192.168.245.82
+running client build 10.2.14.3.
+
+Thanks,
+Sheri Berg

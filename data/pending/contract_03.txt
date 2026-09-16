@@ -1,0 +1,27 @@
+SERVICES AGREEMENT
+
+This Agreement is entered into by and between Northgate Analytics
+LLC ("Provider") and Amy Kim ("Client"), residing at
+68088 Rebecca Club Apt. 554, Tarastad, OH 26873.
+
+1. NOTICES
+
+   All notices to Client shall be sent to bcalhoun@example.net
+   or delivered by telephone to (347) 509-0150.
+
+2. PAYMENT
+
+   Client authorizes recurring charges to the payment instrument
+   on file, account number 4806307856031999.
+   Invoices reference purchase order 7001257417946320.
+
+3. TAX REPORTING
+
+   Client certifies that the taxpayer identification number
+   provided for reporting purposes is 461-87-2006.
+
+IN WITNESS WHEREOF, the parties execute this Agreement.
+
+Client: Amy Kim
+Counsel: Lisa Kelley
+Contact: zchurch@example.net
