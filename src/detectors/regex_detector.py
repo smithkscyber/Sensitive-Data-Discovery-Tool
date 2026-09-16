@@ -87,16 +87,25 @@ class Match:
     ``start`` and ``end`` are half-open character offsets into the scanned
     text, the same coordinates ``re`` reports and the same ones the Phase 2
     answer key records, so the two compare directly.
+
+    ``source`` and ``score`` record which engine found this and how sure it
+    was. Both default to the regex detector's situation -- it either matched or
+    it did not, so its confidence is always 1.0 -- which keeps this constructor
+    unchanged for the patterns above while giving the Phase 4 merge what it
+    needs to arbitrate between two engines.
     """
 
     pii_type: str
     start: int
     end: int
     redacted: str
+    source: str = "regex"
+    score: float = 1.0
 
     def __repr__(self) -> str:  # keeps raw PII out of tracebacks and logs
         return (
-            f"Match({self.pii_type}, {self.start}:{self.end}, {self.redacted!r})"
+            f"Match({self.pii_type}, {self.start}:{self.end}, "
+            f"{self.redacted!r}, via {self.source})"
         )
 
 
@@ -133,6 +142,16 @@ def redact(pii_type: str, value: str) -> str:
     if pii_type == IP_ADDRESS:
         octets = value.split(".")
         return ".".join(octets[:2] + ["x"] * 2)
+    if pii_type == "PERSON":
+        # Initials are enough to correlate two findings about the same person
+        # without the report naming them.
+        return " ".join(
+            word[0] + "*" * (len(word) - 1) for word in value.split() if word
+        )
+    if pii_type == "LOCATION":
+        # No partial reveal: a street number alone can identify a household,
+        # and there is no equivalent of "last four" that stays safe.
+        return "*" * len(value)
     if pii_type in (US_SSN, CREDIT_CARD, PHONE_NUMBER):
         # Keep the last four digits and every separator; mask the rest, so the
         # shape of the value survives but its content does not.

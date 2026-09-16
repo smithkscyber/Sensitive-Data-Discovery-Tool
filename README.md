@@ -2,7 +2,7 @@
 
 Python based detection tool combining regex pattern matching and Microsoft Presidio's NLP engine to identify SSNs, credit card numbers, emails, phone numbers, and addresses across document sets, modeling data governance workflows used in e-discovery and compliance.
 
-> **Status:** in progress. Scaffold (Phase 1), the synthetic corpus and answer key (Phase 2), and the regex detection baseline (Phase 3) are complete; NLP detection, parsing, risk scoring, CLI, and UI are still being built.
+> **Status:** in progress. Scaffold (Phase 1), synthetic corpus and answer key (Phase 2), regex baseline (Phase 3), and hybrid regex+NLP detection (Phase 4) are complete; multi-format parsing, risk scoring, CLI, and UI are still being built.
 
 ## Planned capabilities
 
@@ -24,6 +24,7 @@ python -m venv venv
 source venv/bin/activate    # Windows: venv\Scripts\activate
 
 pip install -r requirements.txt
+python -m spacy download en_core_web_lg    # ~560MB language model
 ```
 
 Verify the scaffold runs:
@@ -41,13 +42,14 @@ Sensitive-Data-Discovery-Tool/
 │   ├── pending/          # source text for docx/pdf fixtures (Phase 5)
 │   └── answer_key.json   # ground truth: types + character offsets
 ├── src/
-│   ├── detectors/        # regex + Presidio detection engines
+│   ├── detectors/        # regex_detector, nlp_detector, hybrid merge
 │   ├── parsers/          # per-format text extraction
 │   ├── reporting/        # risk scoring and report building
 │   └── evaluation.py     # precision/recall against the answer key
 ├── scripts/
 │   ├── generate_test_data.py
-│   └── score_detector.py
+│   ├── score_detector.py
+│   └── compare_detectors.py
 ├── tests/
 ├── app.py                # Streamlit entry point
 ├── main.py               # CLI entry point
@@ -57,40 +59,72 @@ Sensitive-Data-Discovery-Tool/
 
 ## Detection
 
-The regex baseline covers identifiers with fixed structure:
+Two engines, because neither is sufficient alone.
+
+**`regex_detector.py`** matches shape. Good for identifiers with fixed structure, and validated beyond the pattern where possible:
 
 | Type | Notes |
 |---|---|
-| `US_SSN` | Encodes the real issuance rules — areas `000`, `666`, `900–999`, group `00` and serial `0000` are never issued |
+| `US_SSN` | Encodes real issuance rules — areas `000`, `666`, `900–999`, group `00`, serial `0000` are never issued |
 | `CREDIT_CARD` | Structural match, then a Luhn checksum. The checksum is what rejects sixteen-digit order numbers |
 | `EMAIL_ADDRESS` | Pragmatic pattern, not full RFC 5322 |
-| `PHONE_NUMBER` | Three common US formats: `(555) 123-4567`, `555-123-4567`, `555.123.4567` |
-| `IP_ADDRESS` | Octets validated `0–255` in the pattern |
+| `PHONE_NUMBER` | Three common US formats |
+| `IP_ADDRESS` | Octets validated `0–255` |
 
-`PERSON` and `LOCATION` are deliberately absent — they are defined by context, not shape, and no character pattern can separate a surname from a place name. Phase 4 adds them via Presidio.
+**`nlp_detector.py`** wraps Presidio's `AnalyzerEngine`, which runs a spaCy NER model and so can use context. It is the only source for `PERSON` and `LOCATION` — entities defined by meaning rather than shape, which no character pattern can reach.
 
-Matches never carry the raw matched text. `Match` holds the type, the span, and a masked preview (`***-**-0035`), so a scan log does not become a second copy of the data.
+**`hybrid.py`** merges them. Not a concatenation: a set of rules about who to believe.
+
+- **Regex is authoritative** for the five structured types, where it is checksum- and format-validated. Where both engines fire on one span, the regex verdict wins.
+- **Authority is not a veto.** A Presidio match that regex simply missed is still kept — dropping it would discard the recall the NLP layer was added for.
+- **Longer spans win** between equally trusted matches, so a `PERSON` detected *inside* an address is treated as a fragment of it rather than a second finding.
+- **`LOCATION` fragments are stitched.** Presidio reads `123 Main Street, Springfield, IL` as two separate spans. One address should be one finding. Stitching is restricted to `LOCATION` and to gaps of punctuation — applying it to every type would merge two adjacent emails in a CSV row into one.
+
+Matches never carry the raw matched text, from either engine. A `Match` holds the type, the span, a masked preview, its source, and a confidence score.
 
 ### Scoring
 
 ```bash
-python scripts/score_detector.py    # precision / recall table
-python -m pytest tests/             # unit + corpus tests
+python scripts/compare_detectors.py    # all three detectors side by side
+python scripts/score_detector.py       # regex baseline only
+python -m pytest tests/                # 98 unit + corpus tests
 ```
 
-Current baseline, all 14 corpus files:
+Measured over all 14 corpus files:
 
 ```
-TYPE              FOUND  ACTUAL    TP   FP   FN    PREC  RECALL      F1
-CREDIT_CARD           8       8     8    0    0   1.000   1.000   1.000
-EMAIL_ADDRESS        43      43    43    0    0   1.000   1.000   1.000
-IP_ADDRESS           10       5     5    5    0   0.500   1.000   0.667
-PHONE_NUMBER         35      35    35    0    0   1.000   1.000   1.000
-US_SSN               35      35    35    0    0   1.000   1.000   1.000
-ALL                 131     126   126    5    0   0.962   1.000   0.981
+DETECTOR                   PRECISION    RECALL        F1    TP    FP    FN
+Regex only                     0.962     1.000     0.981   126     5     0
+Presidio NLP only              0.819     0.931     0.871   203    45    15
+Hybrid (regex + NLP)           0.854     0.946     0.898   211    36    12
 ```
 
-**The IP score is the interesting one.** Five false positives, all on the planted version strings like `10.2.14.3`. The pattern is not wrong — that is a syntactically valid address — it simply cannot see that the sentence is about a software build. Separating the two requires context, which is precisely what the NLP layer in Phase 4 is for. That gap is the reason regex comes first: it makes the improvement measurable rather than assumed.
+**Read the TP column, not the F1 column.** Regex scores the highest F1 — but only because it is graded on the 126 findings it is capable of attempting, ignoring the 97 `PERSON` and `LOCATION` values it cannot see. The hybrid is measured on all 223 and still finds 211 of them. Comparing F1 across detectors with different scopes compares the difficulty of the subset, not the quality of the engine.
+
+Against the fair comparison — NLP alone, scored on the same entity set — the merge improves **both** precision (0.819 → 0.854) and recall (0.931 → 0.946). Those gains are traceable to specific rules:
+
+| Row | Effect of the merge |
+|---|---|
+| `CREDIT_CARD` | Presidio finds 6 of 8; regex finds all 8, and authority keeps them → recall 0.750 → 1.000 |
+| `PHONE_NUMBER` | Presidio contributes 6 false positives; regex authority drops them → precision 0.850 → 1.000 |
+| `LOCATION` | Stitching collapses fragmented addresses → false positives 11 → 3, precision 0.694 → 0.893 |
+
+### Known limitations
+
+**`PERSON` precision is 0.682, and the corpus is partly responsible.** All 28 false positives fall inside a real address. Faker builds street and city names out of person names — `West Bianca`, `Darren Locks`, `Tyler Knoll` — so the NER reads them as people. Given real addresses, Presidio labels them correctly:
+
+```
+"123 Main Street, Springfield, IL 62704"  -> LOCATION, LOCATION      (correct)
+"8941 Brian Ports, West Bianca, MH 17414" -> LOCATION, PERSON        (wrong)
+```
+
+The number is a property of the test data as much as of the detector, and it would be dishonest to quote 0.682 as this tool's real-world `PERSON` precision.
+
+**`LOCATION` recall is 0.714** — Presidio misses 10 of 35 addresses outright, for the same reason.
+
+**`IP_ADDRESS` precision is 0.500**, unchanged from Phase 3. Presidio does not detect IPs in the configured entity set, so the merge has no second opinion to bring, and the version-string decoys still fool the pattern.
+
+**These numbers are tied to the pinned versions.** Presidio's accuracy comes from a spaCy model; upgrading `en_core_web_lg` changes which entities are found and how their spans are bounded.
 
 ### What these numbers do not mean
 
