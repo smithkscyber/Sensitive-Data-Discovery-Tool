@@ -1,0 +1,4 @@
+# Phase 1 dependencies. Later phases add presidio-analyzer, presidio-anonymizer,
+# pdfplumber, python-docx, and streamlit.
+faker
+pandas
