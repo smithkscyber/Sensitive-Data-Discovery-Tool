@@ -8,6 +8,8 @@ this code. Accuracy is measured against the corpus in test_hybrid.py instead.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from src.detectors import nlp_detector
@@ -103,3 +105,105 @@ def test_location_redaction_reveals_nothing():
 def test_email_redaction_is_shared_with_the_regex_detector(matches):
     """Both engines must mask identically, or reports would leak inconsistently."""
     assert redact(EMAIL_ADDRESS, "ada@example.org") == "a**@example.org"
+
+
+# ------------------------------------------------- US address recognizer
+
+
+ADDRESS_PATTERN = re.compile(nlp_detector.US_ADDRESS_REGEX)
+
+
+@pytest.mark.parametrize(
+    "address",
+    [
+        "123 Main Street, Springfield, IL 62704",
+        "450 Oak Ave Apt 3B, Portland, OR 97201-1234",
+        "1600 Pennsylvania Avenue NW, Washington, DC 20500",
+        "77 Beacon St, Boston, MA 02108",
+        "1234 W 5th Ave, New York, NY 10001",
+        "900 Grand Blvd Suite 1200, Kansas City, MO 64106",
+        "18 Rue St. Charles, St. Paul, MN 55102",
+    ],
+)
+def test_address_pattern_matches_real_addresses(address):
+    """Real addresses, none of which appear in the corpus.
+
+    The recognizer was written against Faker output, so the risk worth testing
+    is that it learned the generator rather than the convention.
+    """
+    assert ADDRESS_PATTERN.fullmatch(address)
+
+
+@pytest.mark.parametrize(
+    "text, why",
+    [
+        ("Invoice 12345 was, oddly, IN 46011", "lower-case words are not a street"),
+        ("ticket 4471 opened, closed, BY 10293", "lower-case words are not a street"),
+        ("we shipped 500 units, roughly, TO 90210", "lower-case words are not a street"),
+        # These isolate the street-token rule: the city, state and ZIP are all
+        # well-formed, so only the requirement that a street name be title-case
+        # stands between the pattern and a false positive. Without them the
+        # suite passed even after that constraint was removed.
+        (
+            "Invoice 12345 was rejected, Springfield, IL 62704",
+            "a lower-case clause is not a street name",
+        ),
+        (
+            "Order 4471 shipped late, Portland, OR 97201",
+            "a lower-case clause is not a street name",
+        ),
+        ("Card: 4720 0566 5876 3761", "a card number has no city or state"),
+        ("call 555-123-4567, then, MH 17414", "no street number and street name"),
+        ("10.235.204.93", "an IP address is not an address"),
+    ],
+)
+def test_address_pattern_rejects_near_misses(text, why):
+    assert ADDRESS_PATTERN.search(text) is None, why
+
+
+def test_address_pattern_generalizes_beyond_the_committed_corpus():
+    """Regression guard against over-fitting.
+
+    Generates addresses from a seed the pattern was never tuned against. A
+    change that raises the corpus score by narrowing the pattern onto the
+    committed fixtures will fail here.
+
+    This tests generalization across address *instances*, not across address
+    *formats* -- these are still Faker's US layout. The hand-written real
+    addresses above cover format variation.
+    """
+    from faker import Faker
+
+    fake = Faker("en_US")
+    Faker.seed(999999)
+    addresses = [
+        f"{fake.street_address()}, {fake.city()}, {fake.state_abbr()} {fake.postcode()}"
+        for _ in range(300)
+    ]
+    missed = [a for a in addresses if not ADDRESS_PATTERN.fullmatch(a)]
+    assert missed == [], f"{len(missed)} of 300 unseen addresses missed"
+
+
+def test_address_pattern_stays_quiet_on_ordinary_prose():
+    """False-positive guard on text containing no addresses at all."""
+    from faker import Faker
+
+    fake = Faker("en_US")
+    Faker.seed(123456)
+    paragraphs = [fake.paragraph(nb_sentences=6) for _ in range(200)]
+    fired = [p for p in paragraphs if ADDRESS_PATTERN.search(p)]
+    assert fired == [], f"fired on {len(fired)} of 200 address-free paragraphs"
+
+
+def test_recognizer_reports_the_whole_address_as_one_span():
+    text = "Mail it to 8941 Brian Ports, West Bianca, MH 17414 by Friday."
+    locations = [m for m in nlp_detector.scan_text(text) if m.pii_type == LOCATION]
+    assert len(locations) == 1
+    assert text[locations[0].start : locations[0].end] == (
+        "8941 Brian Ports, West Bianca, MH 17414"
+    )
+
+
+def test_recognizer_outscores_the_models_own_fragments():
+    """It must outrank the NER's 0.85 spans to win the merge's tie-breaks."""
+    assert nlp_detector.US_ADDRESS_SCORE > 0.85

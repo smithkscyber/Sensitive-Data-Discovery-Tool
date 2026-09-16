@@ -71,7 +71,9 @@ Two engines, because neither is sufficient alone.
 | `PHONE_NUMBER` | Three common US formats |
 | `IP_ADDRESS` | Octets validated `0–255` |
 
-**`nlp_detector.py`** wraps Presidio's `AnalyzerEngine`, which runs a spaCy NER model and so can use context. It is the only source for `PERSON` and `LOCATION` — entities defined by meaning rather than shape, which no character pattern can reach.
+**`nlp_detector.py`** wraps Presidio's `AnalyzerEngine`, which runs a spaCy NER model and so can use context. It is the only source for `PERSON` — an entity defined by meaning rather than shape, which no character pattern can reach.
+
+It also registers a **custom US address recognizer**. The NER alone reads an address as loose fragments and mislabels the parts, because street and city names are drawn from personal names in the real world as much as in Faker — Washington, Jackson, Madison. Structure resolves what context cannot: no person's name is followed by a comma, a state code and a ZIP. Tokens must be title-case, which is what separates an address from a sentence that happens to contain commas and digits.
 
 **`hybrid.py`** merges them. Not a concatenation: a set of rules about who to believe.
 
@@ -87,7 +89,7 @@ Matches never carry the raw matched text, from either engine. A `Match` holds th
 ```bash
 python scripts/compare_detectors.py    # all three detectors side by side
 python scripts/score_detector.py       # regex baseline only
-python -m pytest tests/                # 98 unit + corpus tests
+python -m pytest tests/                # 118 unit + corpus tests
 ```
 
 Measured over all 14 corpus files:
@@ -95,32 +97,49 @@ Measured over all 14 corpus files:
 ```
 DETECTOR                   PRECISION    RECALL        F1    TP    FP    FN
 Regex only                     0.962     1.000     0.981   126     5     0
-Presidio NLP only              0.819     0.931     0.871   203    45    15
-Hybrid (regex + NLP)           0.854     0.946     0.898   211    36    12
+Presidio NLP only              0.862     0.977     0.916   213    34     5
+Hybrid (regex + NLP)           0.978     0.991     0.984   221     5     2
 ```
 
-**Read the TP column, not the F1 column.** Regex scores the highest F1 — but only because it is graded on the 126 findings it is capable of attempting, ignoring the 97 `PERSON` and `LOCATION` values it cannot see. The hybrid is measured on all 223 and still finds 211 of them. Comparing F1 across detectors with different scopes compares the difficulty of the subset, not the quality of the engine.
+Per type, the hybrid:
 
-Against the fair comparison — NLP alone, scored on the same entity set — the merge improves **both** precision (0.819 → 0.854) and recall (0.931 → 0.946). Those gains are traceable to specific rules:
+```
+TYPE              FOUND  ACTUAL    TP   FP   FN    PREC  RECALL      F1
+CREDIT_CARD           8       8     8    0    0   1.000   1.000   1.000
+EMAIL_ADDRESS        43      43    43    0    0   1.000   1.000   1.000
+IP_ADDRESS           10       5     5    5    0   0.500   1.000   0.667
+LOCATION             35      35    35    0    0   1.000   1.000   1.000
+PERSON               60      62    60    0    2   1.000   0.968   0.984
+PHONE_NUMBER         35      35    35    0    0   1.000   1.000   1.000
+US_SSN               35      35    35    0    0   1.000   1.000   1.000
+```
+
+**Read the TP column, not the F1 column.** Regex scores the highest F1 — but only because it is graded on the 126 findings it is capable of attempting, ignoring the 97 `PERSON` and `LOCATION` values it cannot see. The hybrid is measured on all 223 and finds 221 of them. Comparing F1 across detectors with different scopes compares the difficulty of the subset, not the quality of the engine.
+
+Against the fair comparison — NLP alone, scored on the same entity set — the merge improves **both** precision (0.862 → 0.978) and recall (0.977 → 0.991). Those gains are traceable to specific rules:
 
 | Row | Effect of the merge |
 |---|---|
 | `CREDIT_CARD` | Presidio finds 6 of 8; regex finds all 8, and authority keeps them → recall 0.750 → 1.000 |
 | `PHONE_NUMBER` | Presidio contributes 6 false positives; regex authority drops them → precision 0.850 → 1.000 |
-| `LOCATION` | Stitching collapses fragmented addresses → false positives 11 → 3, precision 0.694 → 0.893 |
+| `PERSON` | Presidio emits 28 spurious spans inside addresses; the longest-span rule discards them → precision 0.682 → 1.000 |
+
+That `PERSON` row is the clearest argument for having a merge layer at all. **Neither piece fixes it alone.** Presidio still emits all 28 spurious spans even with the address recognizer installed — it does not reconcile its own overlapping opinions. What removes them is the combination: the recognizer supplies a full-address span, and the merge then treats a `PERSON` sitting inside one as a fragment of it.
+
+### Guarding against over-fitting
+
+A custom pattern written against the corpus it is then scored on is the classic way to manufacture good numbers. The address recognizer is held to two checks that the corpus score cannot provide, both in the test suite:
+
+- **300 addresses from a seed the pattern was never tuned against** — all matched in full. A change that raises the corpus score by narrowing onto the committed fixtures fails this test.
+- **200 paragraphs of address-free prose** — zero false positives.
+
+Plus seven hand-written real addresses (`1600 Pennsylvania Avenue NW, Washington, DC 20500`, `18 Rue St. Charles, St. Paul, MN 55102`) that cover format variation the generator never produces, and six adversarial near misses that must stay clean.
+
+The honest limit: the 300-address check tests generalization across address *instances*, not across address *formats*. Those are still Faker's US layout. The hand-written cases cover format variation, but seven examples is seven examples.
 
 ### Known limitations
 
-**`PERSON` precision is 0.682, and the corpus is partly responsible.** All 28 false positives fall inside a real address. Faker builds street and city names out of person names — `West Bianca`, `Darren Locks`, `Tyler Knoll` — so the NER reads them as people. Given real addresses, Presidio labels them correctly:
-
-```
-"123 Main Street, Springfield, IL 62704"  -> LOCATION, LOCATION      (correct)
-"8941 Brian Ports, West Bianca, MH 17414" -> LOCATION, PERSON        (wrong)
-```
-
-The number is a property of the test data as much as of the detector, and it would be dishonest to quote 0.682 as this tool's real-world `PERSON` precision.
-
-**`LOCATION` recall is 0.714** — Presidio misses 10 of 35 addresses outright, for the same reason.
+**Two `PERSON` values are still missed** — one in a `To:` header, one in a `Dear ...` salutation. Plain NER misses, unrelated to addresses.
 
 **`IP_ADDRESS` precision is 0.500**, unchanged from Phase 3. Presidio does not detect IPs in the configured entity set, so the merge has no second opinion to bring, and the version-string decoys still fool the pattern.
 

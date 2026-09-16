@@ -57,6 +57,58 @@ NLP_ENTITIES = (
 DEFAULT_SCORE_THRESHOLD = 0.35
 
 
+# A full US mailing address: number, street, city, two-letter state, ZIP.
+#
+# This exists because the NER alone reads an address as loose fragments and
+# frequently mislabels the parts. Street and city names are drawn from personal
+# names in the real world as much as in Faker -- Washington, Jackson, Madison --
+# so "Darren Locks" is not an unreasonable thing for a model to call a person.
+# Structure resolves what context cannot: no person's name is followed by a
+# comma, a state code and a ZIP.
+#
+# Tokens must be title-case, which is what separates an address from a sentence
+# that happens to contain commas and digits. Without that constraint "Invoice
+# 12345 was, oddly, IN 46011" matches; with it, that and every other
+# adversarial case tested comes back clean.
+_STREET_TOKEN = r"[A-Z0-9][A-Za-z0-9.'#/-]*"
+_CITY_TOKEN = r"[A-Z][A-Za-z.'-]*"
+US_ADDRESS_REGEX = (
+    rf"\b\d{{1,6}}[ \t]"
+    rf"(?:{_STREET_TOKEN}[ \t]){{0,5}}{_STREET_TOKEN}"
+    rf",[ \t]?"
+    rf"(?:{_CITY_TOKEN}[ \t]){{0,3}}{_CITY_TOKEN}"
+    rf",[ \t]?"
+    rf"[A-Z]{{2}}[ \t]\d{{5}}(?:-\d{{4}})?\b"
+)
+
+#: High, because the pattern is highly specific -- five structural elements in
+#: a fixed order. It needs to outrank the fragmentary PERSON and LOCATION spans
+#: the NER produces over the same text, which score 0.85.
+US_ADDRESS_SCORE = 0.9
+
+
+def build_address_recognizer():
+    """A pattern recognizer for complete US mailing addresses.
+
+    Registered as a source of LOCATION alongside the model's own predictions.
+    The merge in ``hybrid.py`` prefers the longest span, so a whole address
+    supersedes the fragments the NER found inside it.
+    """
+    from presidio_analyzer import Pattern, PatternRecognizer
+
+    return PatternRecognizer(
+        supported_entity=LOCATION,
+        name="UsStreetAddressRecognizer",
+        patterns=[
+            Pattern(
+                name="us_street_address",
+                regex=US_ADDRESS_REGEX,
+                score=US_ADDRESS_SCORE,
+            )
+        ],
+    )
+
+
 @lru_cache(maxsize=1)
 def get_analyzer():
     """Build the Presidio engine once and reuse it.
@@ -73,7 +125,9 @@ def get_analyzer():
 
     from presidio_analyzer import AnalyzerEngine
 
-    return AnalyzerEngine()
+    analyzer = AnalyzerEngine()
+    analyzer.registry.add_recognizer(build_address_recognizer())
+    return analyzer
 
 
 def scan_text(

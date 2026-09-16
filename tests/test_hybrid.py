@@ -184,41 +184,32 @@ def test_regex_authority_removes_nlp_phone_false_positives(reports):
     assert reports["hybrid"].per_type[PHONE_NUMBER].false_positives == 0
 
 
-def test_stitching_improves_location_precision(reports):
-    """Fragmented addresses counted as separate findings, before and after."""
-    assert reports["nlp"].per_type[LOCATION].false_positives == 11
-    assert reports["hybrid"].per_type[LOCATION].false_positives == 3
+def test_address_recognizer_makes_location_exact(reports):
+    """Every address found, nothing else called an address."""
+    location = reports["hybrid"].per_type[LOCATION]
+    assert location.precision == 1.0
+    assert location.recall == 1.0
 
 
-def test_person_false_positives_are_a_known_corpus_artifact(reports):
-    """Documented, not silently tolerated.
+def test_merge_is_what_clears_the_person_false_positives(reports):
+    """Neither the recognizer nor the merge fixes PERSON precision alone.
 
-    All 28 PERSON false positives sit inside a gold LOCATION: Faker builds
-    street and city names out of person names ("Darren Locks", "West Bianca"),
-    so the NER reads them as people. Real addresses do not behave this way --
-    Presidio labels "123 Main Street, Springfield" correctly. The number is a
-    property of the corpus as much as of the detector.
+    Presidio still emits 28 spurious PERSON spans -- Faker builds street and
+    city names out of personal names ("Darren Locks", "West Bianca"), and the
+    NER reads them as people. Adding the address recognizer does not stop it
+    doing that; Presidio does not reconcile its own overlapping opinions.
+
+    What removes them is the combination: the recognizer supplies a full
+    address span, and the merge's longest-span rule then treats the PERSON
+    sitting inside it as a fragment. That is the whole argument for having a
+    merge layer rather than trusting one engine's output.
     """
-    import json
-    from pathlib import Path
+    assert reports["nlp"].per_type[PERSON].false_positives == 28
+    assert reports["hybrid"].per_type[PERSON].false_positives == 0
 
-    from src.evaluation import REPO_ROOT
 
-    key = json.loads((REPO_ROOT / "data" / "answer_key.json").read_text())
-    stray = 0
-    for entry in key["files"]:
-        text = (REPO_ROOT / entry["path"]).read_text()
-        people = [f for f in entry["findings"] if f["type"] == PERSON]
-        places = [f for f in entry["findings"] if f["type"] == LOCATION]
-        for match in hybrid.scan_text(text):
-            if match.pii_type != PERSON:
-                continue
-            if any(match.start < g["end"] and g["start"] < match.end for g in people):
-                continue
-            if not any(
-                match.start < g["end"] and g["start"] < match.end for g in places
-            ):
-                stray += 1
-
-    assert reports["hybrid"].per_type[PERSON].false_positives == 28
-    assert stray == 0, "every PERSON false positive should fall inside an address"
+def test_hybrid_has_no_false_positives_outside_the_ip_decoys(reports):
+    """The only remaining false positives are the documented version strings."""
+    totals = reports["hybrid"].totals
+    assert totals.false_positives == 5
+    assert all(hit["pii_type"] == "IP_ADDRESS" for hit in reports["hybrid"].decoy_hits)
