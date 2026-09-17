@@ -2,7 +2,7 @@
 
 Python based detection tool combining regex pattern matching and Microsoft Presidio's NLP engine to identify SSNs, credit card numbers, emails, phone numbers, and addresses across document sets, modeling data governance workflows used in e-discovery and compliance.
 
-> **Status:** in progress. Scaffold (Phase 1), synthetic corpus and answer key (Phase 2), regex baseline (Phase 3), hybrid regex+NLP detection (Phase 4), and multi-format parsing (Phase 5) are complete; risk scoring, CLI, and UI are still being built.
+> **Status:** in progress. Scaffold (Phase 1), synthetic corpus and answer key (Phase 2), regex baseline (Phase 3), hybrid regex+NLP detection (Phase 4), multi-format parsing (Phase 5), and risk scoring and reporting (Phase 6) are complete; the CLI and UI are still being built.
 
 ## Planned capabilities
 
@@ -43,7 +43,7 @@ Sensitive-Data-Discovery-Tool/
 ├── src/
 │   ├── detectors/        # regex_detector, nlp_detector, hybrid merge
 │   ├── parsers/          # text/csv/docx/pdf extraction + dispatcher
-│   ├── reporting/        # risk scoring and report building
+│   ├── reporting/        # risk_scorer, report_builder
 │   └── evaluation.py     # precision/recall against the answer key
 ├── scripts/
 │   ├── generate_test_data.py
@@ -88,7 +88,7 @@ Matches never carry the raw matched text, from either engine. A `Match` holds th
 ```bash
 python scripts/compare_detectors.py    # all three detectors side by side
 python scripts/score_detector.py       # regex baseline only
-python -m pytest tests/                # 175 unit + corpus tests
+python -m pytest tests/                # 223 unit + corpus tests
 ```
 
 Measured over all 14 corpus files:
@@ -184,6 +184,65 @@ using the OLD offsets against the converted file:
 The CSV shifted too (+5 to +28 characters), which is the less obvious half: it is easy to anticipate that PDF mangles layout and forget that flattening a table does the same thing.
 
 Detection accuracy is **unchanged** after the conversion — precision 0.978, recall 0.991, exactly as in Phase 4. That is the point. The corpus got harder to read; the offsets were re-derived correctly; the numbers held.
+
+## Risk scoring and reporting
+
+A scan of a real file share returns thousands of findings, and nobody reads thousands of findings. The score exists for triage — which file does someone open first — so the rule is a judgement about harm, written where a reviewer can argue with it.
+
+| Type | Weight | Why |
+|---|---|---|
+| `US_SSN` | 10 | Permanent and effectively non-reissuable — a lifetime identity-theft exposure |
+| `CREDIT_CARD` | 9 | Direct financial loss, but a card is cancelled and reissued in days, so the harm has a floor |
+| `LOCATION` | 5 | A home address enables physical-world harm and is directly identifying |
+| `EMAIL_ADDRESS` | 3 | Contact detail *and* account identifier — the hinge for password resets |
+| `IP_ADDRESS` | 3 | A quasi-identifier: personal data under GDPR, little use alone |
+| `PHONE_NUMBER` | 2 | Widely circulated already; a SIM-swap vector, not a standalone disclosure |
+| `PERSON` | 2 | A name alone is often public; it matters as the key that makes everything else on the page identifying |
+
+An unrecognised type scores 5, not 0. Scoring the unknown as harmless would let adding a new detector make a file look *safer* than before.
+
+### Why the score is not just a weighted sum
+
+`weight × count`, summed, is the obvious rule — and it has an obvious failure: **volume drowns severity.** Straight from this project's own corpus:
+
+```
+ 37  memo_01.txt     (11 findings, no card, no volume of anything serious)
+ 33  letter_01.pdf   ( 7 findings, holds an SSN *and* a credit card)
+```
+
+Sorted by total, the memo gets triaged first. That is the wrong answer.
+
+So a file is never ranked below its single most sensitive item. One SSN puts a file in `HIGH` however quiet the rest of it is; volume escalates from there, which is what carries the contact CSVs up into `CRITICAL`.
+
+| Band | Reached by |
+|---|---|
+| `CRITICAL` | Total ≥ 100 |
+| `HIGH` | Total ≥ 30, **or** containing any SSN / credit card |
+| `MEDIUM` | Total ≥ 10, **or** containing any home address |
+| `LOW` | Anything found at all |
+| `NONE` | Clean |
+
+### Two frames
+
+```
+FILE              FMT   FINDINGS   RISK  PEAK  BAND
+contacts_01.csv   csv         40    176    10  CRITICAL
+memo_02.txt       txt         12     46    10  HIGH
+contract_01.docx  docx         9     38    10  HIGH
+letter_01.pdf     pdf          7     33    10  HIGH
+```
+
+`write_reports()` emits both views in the format you ask for — `report.csv` (one row per file, triage order) and `report.findings.csv` beside it (one row per file and PII type). Both export to CSV or JSON.
+
+A clean file still gets a row. A file missing from a report is indistinguishable from a file that was never scanned.
+
+### Reports contain no PII
+
+Only types, counts and scores cross into a report — never a matched value, not even redacted. A report should be safe to attach to a ticket or mail to a reviewer without becoming a second copy of the data it exists to warn about.
+
+That is enforced by a test that scans the real corpus, writes a real report, and asserts that not one of the 223 planted values appears anywhere in the output.
+
+*Caveat on the bands:* every file in this corpus contains an SSN, so every one scores `HIGH` or `CRITICAL`. The corpus cannot exercise `LOW`, `MEDIUM` or `NONE` at all — those paths are covered by unit tests instead.
 
 ## Test data and the answer key
 
