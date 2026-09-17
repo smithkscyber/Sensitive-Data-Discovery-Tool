@@ -2,7 +2,7 @@
 
 Python based detection tool combining regex pattern matching and Microsoft Presidio's NLP engine to identify SSNs, credit card numbers, emails, phone numbers, and addresses across document sets, modeling data governance workflows used in e-discovery and compliance.
 
-> **Status:** in progress. Scaffold (Phase 1), synthetic corpus and answer key (Phase 2), regex baseline (Phase 3), hybrid regex+NLP detection (Phase 4), multi-format parsing (Phase 5), and risk scoring and reporting (Phase 6) are complete; the CLI and UI are still being built.
+> **Status:** in progress. Everything through the end-to-end CLI (Phases 1–7) is complete and runs. The Streamlit UI and final documentation pass are still to come.
 
 ## Planned capabilities
 
@@ -27,10 +27,10 @@ pip install -r requirements.txt
 python -m spacy download en_core_web_lg    # ~560MB language model
 ```
 
-Verify the scaffold runs:
+Then scan something:
 
 ```bash
-python main.py
+python main.py --input data/raw --output report.csv
 ```
 
 ## Project structure
@@ -44,7 +44,8 @@ Sensitive-Data-Discovery-Tool/
 │   ├── detectors/        # regex_detector, nlp_detector, hybrid merge
 │   ├── parsers/          # text/csv/docx/pdf extraction + dispatcher
 │   ├── reporting/        # risk_scorer, report_builder
-│   └── evaluation.py     # precision/recall against the answer key
+│   ├── evaluation.py     # precision/recall against the answer key
+│   └── scanner.py        # walks a path: parse -> detect -> score
 ├── scripts/
 │   ├── generate_test_data.py
 │   ├── score_detector.py
@@ -55,6 +56,77 @@ Sensitive-Data-Discovery-Tool/
 ├── requirements.txt
 └── README.md
 ```
+
+## Usage
+
+```bash
+python main.py --input data/raw --output report.csv
+```
+
+```
+FILE              FMT   FINDINGS   RISK  PEAK  BAND
+contacts_01.csv   csv         40    176    10  CRITICAL
+contacts_02.csv   csv         40    176    10  CRITICAL
+memo_02.txt       txt         12     46    10  HIGH
+contract_01.docx  docx         9     38    10  HIGH
+letter_01.pdf     pdf          7     33    10  HIGH
+...
+14 files, 226 findings  (HIGH 11, CRITICAL 3)
+```
+
+| Flag | Meaning |
+|---|---|
+| `--input`, `-i` | File or directory to scan (required) |
+| `--output`, `-o` | Report path, `.csv` or `.json` (default `report.csv`) |
+| `--no-recursive` | Stay at the top level |
+| `--quiet`, `-q` | Write reports without printing the table |
+
+Two reports are written: `report.csv` (one row per file, triage order) and `report.findings.csv` beside it (one row per file and PII type).
+
+### Three outcomes, all reported
+
+Pointed at a directory nobody curated, every file lands in exactly one state:
+
+| State | Meaning |
+|---|---|
+| **scored** | Read and scanned — findings may be zero |
+| **skipped** | No extractor for that extension (`.zip`) — listed on stderr |
+| **failed** | An extractor was tried and raised (corrupt PDF, broken DOCX) — listed on stderr |
+
+The distinction between the last two and *"scored, nothing found"* is the point. **A file the tool could not read is not a clean file**, and a clean result is exactly what nobody investigates. One bad file never aborts a scan, and never disappears from it either:
+
+```
+Failed to read 2 file(s):
+  messy/broken.docx: PackageNotFoundError: Package not found at 'messy/broken.docx'
+  messy/corrupt.pdf: PdfminerException: No /Root object! - Is this really a PDF?
+```
+
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Every file was read, whether or not anything was found |
+| `1` | At least one file could not be read |
+| `2` | Bad arguments, or the input path does not exist |
+
+A scan that found nothing and a scan that could not read half the share must not look the same to a caller, so an unreadable file is a non-zero exit rather than a line of output somebody might miss. Skipped files do *not* make a scan incomplete — having no extractor for `.zip` is an honest answer; failing to read a `.pdf` you claimed to support is a gap in coverage.
+
+### End-to-end against the answer key
+
+The full CLI run, per-type totals compared against ground truth:
+
+```
+TYPE              TRUTH  REPORT  DELTA  explanation
+CREDIT_CARD           8       8     +0
+EMAIL_ADDRESS        43      43     +0
+IP_ADDRESS            5      10     +5   5 planted version-string decoys, by design
+LOCATION             35      35     +0
+PERSON               62      60     -2   2 known NER misses (To: header, Dear salutation)
+PHONE_NUMBER         35      35     +0
+US_SSN               35      35     +0
+```
+
+Five of seven types exact; both deltas are the known, documented discrepancies, asserted in the test suite so they cannot drift silently.
 
 ## Detection
 
@@ -88,7 +160,7 @@ Matches never carry the raw matched text, from either engine. A `Match` holds th
 ```bash
 python scripts/compare_detectors.py    # all three detectors side by side
 python scripts/score_detector.py       # regex baseline only
-python -m pytest tests/                # 223 unit + corpus tests
+python -m pytest tests/                # 255 unit + corpus tests
 ```
 
 Measured over all 14 corpus files:
