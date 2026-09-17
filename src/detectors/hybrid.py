@@ -41,22 +41,40 @@ _STITCH_GAP = 2
 _STITCH_FILLER = set(", \t")
 
 
-def _source_rank(match: Match) -> int:
-    """Lower sorts first, and sorting first means winning an overlap."""
-    if match.pii_type in REGEX_AUTHORITATIVE:
-        return 0 if match.source == "regex" else 1
-    return 0
+def _authority(match: Match) -> int:
+    """How well evidenced a match is. Lower sorts first, and first wins.
+
+    Two tiers, not three. A regex hit on an authoritative type is
+    *structurally validated* -- a Luhn checksum passed, an SSN obeys real
+    issuance rules, every octet is in range -- and its boundaries are exact.
+    Everything else is a model's inference with fuzzy edges.
+
+    This used to rank by source only *within* a type, which meant a
+    PERSON or LOCATION span could outrank a validated match of a different
+    type purely by being longer. It discarded real findings:
+
+        regex:  PHONE_NUMBER [68:80] '555-123-4567'
+        nlp:    PERSON       [65:80] 'al 555-123-4567'   <- mis-bounded
+        merged: PERSON only, phone number gone
+
+    Every structured type was reachable that way, including CREDIT_CARD and
+    US_SSN. A validated finding must never lose to a guess that happens to
+    span more characters.
+    """
+    if match.source == "regex" and match.pii_type in REGEX_AUTHORITATIVE:
+        return 0
+    return 1
 
 
 def _resolve(matches: list[Match]) -> list[Match]:
     """Keep the best match from each set of overlapping candidates.
 
-    Ordering decides the outcome: preferred source first, then the longer span
-    (it explains more of the text), then the more confident score.
+    Ordering decides the outcome: validated evidence first, then the longer
+    span (it explains more of the text), then the more confident score.
     """
     ranked = sorted(
         matches,
-        key=lambda m: (_source_rank(m), -(m.end - m.start), -m.score, m.start),
+        key=lambda m: (_authority(m), -(m.end - m.start), -m.score, m.start),
     )
     kept: list[Match] = []
     for candidate in ranked:

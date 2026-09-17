@@ -10,7 +10,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.parsers import csv_parser, docx_parser, pdf_parser, text_parser
+from src.parsers import (
+    csv_parser,
+    docx_parser,
+    image_parser,
+    ocr,
+    pdf_parser,
+    text_parser,
+)
 
 #: Extension -> extractor. Extend here to add a format; nothing else needs to
 #: know that a new one exists.
@@ -21,6 +28,16 @@ EXTRACTORS = {
     ".csv": csv_parser.extract,
     ".docx": docx_parser.extract,
     ".pdf": pdf_parser.extract,
+    # Images carry no text layer at all, so these depend entirely on OCR. They
+    # are listed as supported regardless of whether Tesseract is installed: a
+    # file the tool declines to look at should be reported as skipped, not
+    # silently absent from the scan.
+    ".png": image_parser.extract,
+    ".jpg": image_parser.extract,
+    ".jpeg": image_parser.extract,
+    ".tif": image_parser.extract,
+    ".tiff": image_parser.extract,
+    ".bmp": image_parser.extract,
 }
 
 SUPPORTED_EXTENSIONS = tuple(sorted(EXTRACTORS))

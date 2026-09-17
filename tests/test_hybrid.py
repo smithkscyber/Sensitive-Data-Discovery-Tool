@@ -219,3 +219,54 @@ def test_hybrid_has_no_false_positives_outside_the_ip_decoys(reports):
     totals = reports["hybrid"].totals
     assert totals.false_positives == 5
     assert all(hit["pii_type"] == "IP_ADDRESS" for hit in reports["hybrid"].decoy_hits)
+
+
+# ------------------------------------- validated evidence beats a long guess
+
+
+@pytest.mark.parametrize(
+    "pii_type, span",
+    [
+        (US_SSN, (10, 21)),
+        (CREDIT_CARD, (10, 29)),
+        (EMAIL_ADDRESS, (10, 30)),
+        (PHONE_NUMBER, (10, 22)),
+        (IP_ADDRESS, (10, 23)),
+    ],
+)
+def test_an_nlp_span_cannot_swallow_a_validated_match(pii_type, span):
+    """Regression: a mis-bounded PERSON span used to discard real findings.
+
+    Source preference used to apply only *within* a type, so a PERSON or
+    LOCATION span one character wider than a Luhn-validated credit card won on
+    length alone and the card was dropped. Every structured type was reachable
+    that way.
+    """
+    text = "x" * 60
+    merged = hybrid.merge(
+        [m(pii_type, span[0], span[1], "regex")],
+        [m(PERSON, span[0] - 1, span[1] + 1, "nlp", 0.85)],
+        text,
+    )
+    assert [x.pii_type for x in merged] == [pii_type]
+
+
+def test_the_case_that_surfaced_the_bug():
+    """Verbatim from the audit: Presidio spanned 'al 555-123-4567' as a PERSON."""
+    text = "Contacte a Margarita en Calle Mayor 4, Madrid, o llame al 555-123-4567."
+    phone = text.index("555-123-4567")
+    merged = hybrid.merge(
+        [m(PHONE_NUMBER, phone, phone + 12, "regex")],
+        [m(PERSON, phone - 3, phone + 12, "nlp", 0.85)],
+        text,
+    )
+    assert PHONE_NUMBER in [x.pii_type for x in merged]
+
+
+def test_an_nlp_match_still_wins_where_regex_has_no_authority():
+    """The fix must not turn regex into a blanket veto over the NLP layer."""
+    text = "y" * 60
+    merged = hybrid.merge(
+        [], [m(LOCATION, 0, 39, "nlp", 0.9), m(PERSON, 18, 29, "nlp", 0.85)], text
+    )
+    assert [x.pii_type for x in merged] == [LOCATION]

@@ -10,10 +10,13 @@ Every file ends in exactly one of three states, and all three are reported:
 * **skipped** -- no extractor for that extension
 * **failed** -- an extractor was tried and raised
 
-The distinction between the last two and "scored with nothing found" is the
-whole point. A tool that quietly drops what it cannot read reports an
-unreadable file as clean, and a clean result is exactly what nobody
-investigates.
+Scored files that yielded *no text at all* are additionally listed under
+``empty``. That case is why: a scanned PDF is a picture of a page, so
+extraction succeeds and returns nothing, and the file scores zero findings and
+a NONE band -- indistinguishable from a genuinely clean document. OCR now
+recovers most of those, but when it cannot (no Tesseract installed, an
+unreadable scan), the fact has to stay visible rather than passing as a clean
+result. A clean result is exactly what nobody investigates.
 """
 
 from __future__ import annotations
@@ -44,6 +47,9 @@ class ScanResult:
     scored: list[FileRisk] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
     failed: list[ScanFailure] = field(default_factory=list)
+    #: Scored files that produced no text. A subset of ``scored``, not a
+    #: fourth outcome -- they were read, there was simply nothing in them.
+    empty: list[str] = field(default_factory=list)
 
     @property
     def files_seen(self) -> int:
@@ -67,8 +73,17 @@ class ScanResult:
 
 def scan_file(path: Path | str, detect: Detector = hybrid.scan_text) -> FileRisk:
     """Parse and scan one file. Raises if the file cannot be read."""
-    file_path = Path(path)
-    return score_file(file_path, detect(parse(file_path)))
+    return _scan(Path(path), detect)[0]
+
+
+def _scan(path: Path, detect: Detector) -> tuple[FileRisk, str]:
+    """Scan a file and hand back the extracted text alongside the score.
+
+    The walk needs the text to tell an empty document from a clean one, and
+    parsing twice to learn that would double the cost of every OCR fallback.
+    """
+    text = parse(path)
+    return score_file(path, detect(text)), text
 
 
 def scan_folder(
@@ -95,7 +110,10 @@ def scan_folder(
             result.skipped.append(path.as_posix())
             continue
         try:
-            result.scored.append(scan_file(path, detect))
+            scored, text = _scan(path, detect)
+            result.scored.append(scored)
+            if not text.strip():
+                result.empty.append(path.as_posix())
         except Exception as error:  # noqa: BLE001 - one bad file must not end the scan
             # Deliberately broad. Parsers wrap third-party libraries that raise
             # their own exception types for a corrupt PDF, an encrypted
@@ -127,7 +145,10 @@ def scan_path(
         result.skipped.append(target.as_posix())
         return result
     try:
-        result.scored.append(scan_file(target, detect))
+        scored, text = _scan(target, detect)
+        result.scored.append(scored)
+        if not text.strip():
+            result.empty.append(target.as_posix())
     except Exception as error:  # noqa: BLE001 - reported, not raised
         result.failed.append(
             ScanFailure(target.as_posix(), f"{type(error).__name__}: {error}")

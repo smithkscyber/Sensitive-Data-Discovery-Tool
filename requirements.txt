@@ -32,6 +32,14 @@ fpdf2==2.8.8
 streamlit==1.64.0
 altair==6.3.0
 
+# OCR, for documents that carry no text layer -- a scanned PDF is a picture of
+# a page, and without this it extracts to nothing and reports as clean.
+# pytesseract is a thin wrapper: Tesseract itself is a system binary and must
+# be installed separately (see README). Everything degrades to "no text
+# recovered" when it is absent rather than failing the scan.
+pytesseract==0.3.13
+pillow==12.3.0
+
 # The language model is not on PyPI. After installing the above, run:
 #     python -m spacy download en_core_web_lg
 # Pinned by spaCy's own versioning to en_core_web_lg 3.8.0 for spacy 3.8.x.

@@ -201,12 +201,21 @@ else:
     )
     st.altair_chart(chart, width="stretch")
 
-if result.skipped or result.failed:
+if result.skipped or result.failed or result.empty:
     st.subheader("Not scanned")
     if result.failed:
         with st.expander(f"{len(result.failed)} file(s) could not be read", expanded=True):
             for failure in result.failed:
                 st.write(f"**{failure.path}** — {failure.reason}")
+    if result.empty:
+        with st.expander(f"{len(result.empty)} file(s) produced no text"):
+            for path in result.empty:
+                st.write(path)
+            st.caption(
+                "Read successfully but empty. For a PDF or an image that "
+                "usually means a scan OCR could not recover — worth a look "
+                "rather than treating as clean."
+            )
     if result.skipped:
         with st.expander(f"{len(result.skipped)} file(s) have no extractor"):
             for path in result.skipped:

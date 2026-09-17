@@ -27,6 +27,15 @@ pip install -r requirements.txt
 python -m spacy download en_core_web_lg    # ~560MB language model
 ```
 
+For OCR — needed to read scanned documents and images — also install Tesseract, which is a system binary rather than a Python package:
+
+```bash
+sudo apt-get install tesseract-ocr        # Debian/Ubuntu
+brew install tesseract                    # macOS
+```
+
+Without it the tool still runs; scanned files are reported as producing no text instead of being read.
+
 Then scan something:
 
 ```bash
@@ -98,6 +107,21 @@ The results view carries the same four metrics as the CLI summary, a per-file ta
 
 That staging logic lives in `src/uploads.py`, not in `app.py`: it has a contract worth testing, and a Streamlit script cannot be imported outside a Streamlit runtime.
 
+### OCR: reading scanned documents
+
+A scanned contract has no text layer — it is an image of a page. Every parser above returns `""`, so the file scores clean. Scanned documents are routine in e-discovery, so this was the most dangerous gap in the tool:
+
+```
+before:  extracted ''  ->  0 findings, band NONE, exit 0
+after:   OCR         ->  2 findings, band HIGH
+```
+
+`.png`, `.jpg`, `.tif` and `.bmp` are scanned the same way.
+
+**OCR runs only where there is no text layer, and only on the pages that need it.** A digital PDF parses in 0.02s and never touches OCR; a mixed document with two scanned inserts pays for two pages, not for the whole file. Pass `use_ocr=False` to skip it entirely on large shares.
+
+**What OCR costs you:** structured detection is only as good as the characters it is handed. On a poor-quality scan Tesseract reads `SSN: 623-98-0035` as `SSSN-623-98 0035` — the separators are mangled, so the SSN pattern no longer matches even though OCR "worked". The NLP layer is more forgiving, which is the same regex-versus-context trade the whole detector rests on. There is a test documenting this rather than hiding it.
+
 ### Three outcomes, all reported
 
 Pointed at a directory nobody curated, every file lands in exactly one state:
@@ -107,6 +131,8 @@ Pointed at a directory nobody curated, every file lands in exactly one state:
 | **scored** | Read and scanned — findings may be zero |
 | **skipped** | No extractor for that extension (`.zip`) — listed on stderr |
 | **failed** | An extractor was tried and raised (corrupt PDF, broken DOCX) — listed on stderr |
+
+Scored files that yielded **no text at all** are additionally listed. That case matters because it used to be invisible: a scanned PDF is a picture of a page, so extraction *succeeds* and returns nothing, and the file scores zero findings with a `NONE` band — indistinguishable from a genuinely clean document. OCR now recovers most of those; when it cannot, the fact stays visible.
 
 The distinction between the last two and *"scored, nothing found"* is the point. **A file the tool could not read is not a clean file**, and a clean result is exactly what nobody investigates. One bad file never aborts a scan, and never disappears from it either:
 
@@ -163,7 +189,7 @@ It also registers a **custom US address recognizer**. The NER alone reads an add
 
 **`hybrid.py`** merges them. Not a concatenation: a set of rules about who to believe.
 
-- **Regex is authoritative** for the five structured types, where it is checksum- and format-validated. Where both engines fire on one span, the regex verdict wins.
+- **Regex is authoritative** for the five structured types, where it is checksum- and format-validated, and its boundaries are exact. A validated match beats *any* overlapping NLP span, not just one claiming the same type — an earlier version ranked by source only within a type, which let a mis-bounded `PERSON` span discard a Luhn-validated credit card purely by being longer.
 - **Authority is not a veto.** A Presidio match that regex simply missed is still kept — dropping it would discard the recall the NLP layer was added for.
 - **Longer spans win** between equally trusted matches, so a `PERSON` detected *inside* an address is treated as a fragment of it rather than a second finding.
 - **`LOCATION` fragments are stitched.** Presidio reads `123 Main Street, Springfield, IL` as two separate spans. One address should be one finding. Stitching is restricted to `LOCATION` and to gaps of punctuation — applying it to every type would merge two adjacent emails in a CSV row into one.
@@ -175,7 +201,7 @@ Matches never carry the raw matched text, from either engine. A `Match` holds th
 ```bash
 python scripts/compare_detectors.py    # all three detectors side by side
 python scripts/score_detector.py       # regex baseline only
-python -m pytest tests/                # 273 unit + corpus tests
+python -m pytest tests/                # 295 unit + corpus tests
 ```
 
 Measured over all 14 corpus files:

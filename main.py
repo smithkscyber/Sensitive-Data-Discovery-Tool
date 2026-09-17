@@ -103,6 +103,17 @@ def main(argv: list[str] | None = None) -> int:
         for path in result.skipped:
             print(f"  {path}", file=sys.stderr)
 
+    if result.empty:
+        # Not an error: an empty file is legitimately empty. But a PDF or an
+        # image that yields nothing is usually a scan OCR could not read, and
+        # that must not pass as a clean result.
+        print(
+            f"\nNo text could be extracted from {len(result.empty)} file(s):",
+            file=sys.stderr,
+        )
+        for path in result.empty:
+            print(f"  {path}", file=sys.stderr)
+
     if result.failed:
         # To stderr and non-zero: these files were not scanned, and treating
         # them as clean is the failure this tool exists to prevent.
