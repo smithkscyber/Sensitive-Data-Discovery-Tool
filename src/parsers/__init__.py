@@ -13,10 +13,14 @@ from pathlib import Path
 from src.parsers import (
     csv_parser,
     docx_parser,
+    eml_parser,
+    html_parser,
     image_parser,
+    json_parser,
     ocr,
     pdf_parser,
     text_parser,
+    xlsx_parser,
 )
 
 #: Extension -> extractor. Extend here to add a format; nothing else needs to
@@ -38,6 +42,15 @@ EXTRACTORS = {
     ".tif": image_parser.extract,
     ".tiff": image_parser.extract,
     ".bmp": image_parser.extract,
+    # Spreadsheets and email are where bulk personal data actually lives in
+    # the workflows this models, so their absence would undercut the framing
+    # more than any detection gap.
+    ".xlsx": xlsx_parser.extract,
+    ".xlsm": xlsx_parser.extract,
+    ".eml": eml_parser.extract,
+    ".html": html_parser.extract,
+    ".htm": html_parser.extract,
+    ".json": json_parser.extract,
 }
 
 SUPPORTED_EXTENSIONS = tuple(sorted(EXTRACTORS))

@@ -40,6 +40,9 @@ altair==6.3.0
 pytesseract==0.3.13
 pillow==12.3.0
 
+# Spreadsheet parsing. .eml, .html and .json need nothing -- stdlib covers them.
+openpyxl==3.1.5
+
 # The language model is not on PyPI. After installing the above, run:
 #     python -m spacy download en_core_web_lg
 # Pinned by spaCy's own versioning to en_core_web_lg 3.8.0 for spacy 3.8.x.

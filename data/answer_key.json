@@ -14,16 +14,16 @@
     "determinism": "No wall-clock timestamp is recorded, so this file changes only when the corpus itself changes. The .docx and .pdf fixtures carry a fixed metadata timestamp for the same reason, though their compressed bytes are not guaranteed identical across library versions; their parsed text is."
   },
   "summary": {
-    "file_count": 14,
-    "finding_count": 223,
+    "file_count": 17,
+    "finding_count": 226,
     "decoy_count": 40,
     "findings_by_type": {
       "CREDIT_CARD": 8,
-      "EMAIL_ADDRESS": 43,
+      "EMAIL_ADDRESS": 44,
       "IP_ADDRESS": 5,
-      "LOCATION": 35,
+      "LOCATION": 36,
       "PERSON": 62,
-      "PHONE_NUMBER": 35,
+      "PHONE_NUMBER": 36,
       "US_SSN": 35
     }
   },
@@ -1771,6 +1771,47 @@
           "reason": "case reference, nine digits with no separators"
         }
       ]
+    },
+    {
+      "path": "data/raw/bulletin_01.txt",
+      "format": "txt",
+      "text_sha256": "427b18143a53239034418885dc5c2ddb0881bce924fe0e95191d7520331aca3b",
+      "findings": [
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 227,
+          "end": 248,
+          "value": "kristen33@example.org"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 268,
+          "end": 280,
+          "value": "328-859-6694"
+        }
+      ],
+      "decoys": []
+    },
+    {
+      "path": "data/raw/site_note_01.txt",
+      "format": "txt",
+      "text_sha256": "424d668088d9824a7cc27a89ef999c8f61b12a17faaa476f5a2bbbdf6de16e4e",
+      "findings": [
+        {
+          "type": "LOCATION",
+          "start": 146,
+          "end": 206,
+          "value": "01849 Rodriguez Rapids Suite 141, West Kristenland, IN 17202"
+        }
+      ],
+      "decoys": []
+    },
+    {
+      "path": "data/raw/retention_01.txt",
+      "format": "txt",
+      "text_sha256": "ec45bc318536ef344982884fffdc0ff0a3bb46e58f7efa8f9a7e4951870edcbf",
+      "findings": [],
+      "decoys": []
     }
   ]
 }

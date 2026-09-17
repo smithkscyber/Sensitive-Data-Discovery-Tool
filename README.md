@@ -99,7 +99,9 @@ Two reports are written: `report.csv` (one row per file, triage order) and `repo
 streamlit run app.py
 ```
 
-Two ways in, one code path behind them: **drag files onto the uploader**, or point it at a folder on the machine running the app. Both call `scanner.scan_path()` — no detection logic lives in the UI, so the CLI and the web app can never disagree about what the tool found.
+Two ways in, one code path behind them: **drag files onto the uploader**, or point it at a folder on the machine running the app.
+
+**The folder field is confined to a scan root** — `SDD_SCAN_ROOT`, defaulting to the working directory. Paths are resolved before the check, so neither `../../etc` nor a symlink planted inside the root escapes it. Unrestricted, that text box would let anyone who can reach the page read any file on the server. The CLI is deliberately *not* confined: whoever runs it already has their shell's access, and fencing that in would be theatre. Both call `scanner.scan_path()` — no detection logic lives in the UI, so the CLI and the web app can never disagree about what the tool found.
 
 The results view carries the same four metrics as the CLI summary, a per-file table with the band colour-coded, a findings-by-type chart, and CSV/JSON downloads. Unreadable files get their own section rather than being dropped.
 
@@ -130,7 +132,7 @@ Pointed at a directory nobody curated, every file lands in exactly one state:
 |---|---|
 | **scored** | Read and scanned — findings may be zero |
 | **skipped** | No extractor for that extension (`.zip`) — listed on stderr |
-| **failed** | An extractor was tried and raised (corrupt PDF, broken DOCX) — listed on stderr |
+| **failed** | An extractor was tried and raised (corrupt PDF, broken DOCX, **password-protected** file) — listed on stderr |
 
 Scored files that yielded **no text at all** are additionally listed. That case matters because it used to be invisible: a scanned PDF is a picture of a page, so extraction *succeeds* and returns nothing, and the file scores zero findings with a `NONE` band — indistinguishable from a genuinely clean document. OCR now recovers most of those; when it cannot, the fact stays visible.
 
@@ -201,16 +203,16 @@ Matches never carry the raw matched text, from either engine. A `Match` holds th
 ```bash
 python scripts/compare_detectors.py    # all three detectors side by side
 python scripts/score_detector.py       # regex baseline only
-python -m pytest tests/                # 295 unit + corpus tests
+python -m pytest tests/                # 337 unit + corpus tests
 ```
 
-Measured over all 14 corpus files:
+Measured over all 17 corpus files:
 
 ```
 DETECTOR                   PRECISION    RECALL        F1    TP    FP    FN
-Regex only                     0.962     1.000     0.981   126     5     0
-Presidio NLP only              0.866     0.977     0.918   213    33     5
-Hybrid (regex + NLP)           0.978     0.991     0.984   221     5     2
+Regex only                     0.962     1.000     0.981   128     5     0
+Presidio NLP only              0.867     0.973     0.917   215    33     6
+Hybrid (regex + NLP)           0.978     0.991     0.985   224     5     2
 ```
 
 Per type, the hybrid:
@@ -218,17 +220,17 @@ Per type, the hybrid:
 ```
 TYPE              FOUND  ACTUAL    TP   FP   FN    PREC  RECALL      F1
 CREDIT_CARD           8       8     8    0    0   1.000   1.000   1.000
-EMAIL_ADDRESS        43      43    43    0    0   1.000   1.000   1.000
+EMAIL_ADDRESS        44      44    44    0    0   1.000   1.000   1.000
 IP_ADDRESS           10       5     5    5    0   0.500   1.000   0.667
-LOCATION             35      35    35    0    0   1.000   1.000   1.000
+LOCATION             36      36    36    0    0   1.000   1.000   1.000
 PERSON               60      62    60    0    2   1.000   0.968   0.984
-PHONE_NUMBER         35      35    35    0    0   1.000   1.000   1.000
+PHONE_NUMBER         36      36    36    0    0   1.000   1.000   1.000
 US_SSN               35      35    35    0    0   1.000   1.000   1.000
 ```
 
-**Read the TP column, not the F1 column.** Regex scores the highest F1 — but only because it is graded on the 126 findings it is capable of attempting, ignoring the 97 `PERSON` and `LOCATION` values it cannot see. The hybrid is measured on all 223 and finds 221 of them. Comparing F1 across detectors with different scopes compares the difficulty of the subset, not the quality of the engine.
+**Read the TP column, not the F1 column.** Regex scores the highest F1 — but only because it is graded on the 126 findings it is capable of attempting, ignoring the 98 `PERSON` and `LOCATION` values it cannot see. The hybrid is measured on all 226 and finds 224 of them. Comparing F1 across detectors with different scopes compares the difficulty of the subset, not the quality of the engine.
 
-Against the fair comparison — NLP alone, scored on the same entity set — the merge improves **both** precision (0.866 → 0.978) and recall (0.977 → 0.991). Those gains are traceable to specific rules:
+Against the fair comparison — NLP alone, scored on the same entity set — the merge improves **both** precision (0.867 → 0.978) and recall (0.973 → 0.991). Those gains are traceable to specific rules:
 
 | Row | Effect of the merge |
 |---|---|
@@ -265,12 +267,19 @@ The phone patterns cover three formats because the corpus contains three. Real-w
 
 `src/parsers/` extracts text per format and dispatches on extension:
 
-| Format | Extractor | Round-trip fidelity |
+| Format | Extractor | Notes |
 |---|---|---|
-| `.txt` | direct read | Exact |
-| `.csv` | `pandas`, flattened to text | Lossless, but reflowed |
+| `.txt` `.md` | direct read | Exact |
+| `.csv` | `pandas`, flattened | Lossless, but reflowed |
 | `.docx` | `python-docx`, paragraphs + tables | Exact |
-| `.pdf` | `pdfplumber`, page by page | **Lossy** — blank lines disappear |
+| `.pdf` | `pdfplumber`, then OCR where there is no text layer | **Lossy** — blank lines disappear |
+| `.xlsx` `.xlsm` | `openpyxl`, every sheet | Formula *results*, not formula text |
+| `.eml` | stdlib `email` | Headers, body **and** text attachments |
+| `.html` `.htm` | stdlib `html.parser` | Visible text; `<script>`/`<style>` ignored |
+| `.json` | stdlib `json` | Flattened to `path.to.key: value` |
+| `.png` `.jpg` `.tif` `.bmp` | OCR | No text layer exists at all |
+
+Spreadsheets and email carry most of the bulk personal data in real shares, and an email hides it in three places at once — headers, body, and whatever is attached. Reading only the body would miss the recipient list entirely.
 
 An unknown extension raises rather than returning `""`. Silence would make an unreadable file indistinguishable from a clean one, which is the most dangerous result this tool can produce.
 
@@ -355,7 +364,7 @@ Only types, counts and scores cross into a report — never a matched value, not
 
 That is enforced by a test that scans the real corpus, writes a real report, and asserts that not one of the 223 planted values appears anywhere in the output.
 
-*Caveat on the bands:* every file in this corpus contains an SSN, so every one scores `HIGH` or `CRITICAL`. The corpus cannot exercise `LOW`, `MEDIUM` or `NONE` at all — those paths are covered by unit tests instead.
+The corpus exercises all five bands — a contact-only bulletin (`LOW`), an address-only site note (`MEDIUM`) and a genuinely clean retention notice (`NONE`) sit alongside the severe files, so the banding logic is validated by real data and not by unit tests alone.
 
 ## Test data and the answer key
 
@@ -386,7 +395,9 @@ The corpus deliberately plants values that *resemble* PII but are not sensitive 
 
 The generator is seeded, and `requirements.txt` pins exact versions. Faker reproduces the same fake people only within a given version — an unpinned upgrade would change the generated text, shift every offset, and invalidate the key. Upgrade deliberately, then regenerate the corpus and key together.
 
-`.txt` and `.csv` fixtures are byte-identical run to run. The `.docx` and `.pdf` fixtures carry fixed metadata timestamps so regenerating does not produce spurious diffs, but their compressed bytes are not guaranteed identical across library versions. What *is* guaranteed stable is the text their parsers extract — which is what the offsets index, and what the `text_sha256` in the key hashes.
+Every fixture is byte-identical run to run, binary formats included, and CI enforces it: a build regenerates the corpus and fails if `git diff` on `data/` is non-empty. If the generator and the committed fixtures ever drift apart, every accuracy figure here is measuring something no longer in the repository.
+
+Getting there took more than setting the documents' metadata timestamps. A `.docx` is a ZIP, and `python-docx` stamps each *archive member* with the wall clock at save time — one level above `docProps/core.xml`, so the document properties were fixed while the file still changed on every run. The archive is now rewritten with frozen member timestamps. (An earlier version of this README claimed the binaries were already stable; that check had simply run twice within the same second.)
 
 The generator refuses to write a corpus it cannot verify: it asserts every recorded span holds the value it claims, that no spans overlap, and that no planted value appears in the text more times than it was recorded.
 

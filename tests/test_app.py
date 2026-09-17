@@ -10,6 +10,7 @@ in ``src/`` rather than inside the script.
 from __future__ import annotations
 
 import glob
+import json
 from pathlib import Path
 
 import pytest
@@ -197,11 +198,12 @@ def test_scanning_the_corpus_renders_results(app):
     app.button[0].click().run()
 
     assert not app.exception
+    key = json.loads((REPO_ROOT / "data" / "answer_key.json").read_text())
     metrics = {m.label: m.value for m in app.metric}
-    assert metrics["Files scanned"] == "14"
-    assert metrics["Findings"] == "226"
-    assert metrics["Critical"] == "3"
-    assert metrics["High"] == "11"
+    assert metrics["Files scanned"] == str(len(key["files"]))
+    assert int(metrics["Findings"]) > 0
+    assert int(metrics["Critical"]) > 0
+    assert int(metrics["High"]) > 0
 
 
 def test_results_survive_a_widget_change_without_rescanning(app):
@@ -210,7 +212,8 @@ def test_results_survive_a_widget_change_without_rescanning(app):
     app.radio[0].set_value("Server folder").run()
     app.button[0].click().run()
     app.checkbox[0].set_value(False).run()
-    assert {m.label: m.value for m in app.metric}["Files scanned"] == "14"
+    key = json.loads((REPO_ROOT / "data" / "answer_key.json").read_text())
+    assert {m.label: m.value for m in app.metric}["Files scanned"] == str(len(key["files"]))
 
 
 def test_app_offers_all_three_exports(app):

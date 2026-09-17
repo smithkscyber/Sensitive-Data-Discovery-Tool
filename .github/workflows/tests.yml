@@ -1,0 +1,54 @@
+name: tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      # Tesseract is a system binary, not a Python package. Without it the OCR
+      # tests skip rather than fail, but then CI would stop covering the path
+      # that keeps a scanned document from being reported as clean.
+      - name: Install Tesseract
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # ~560MB, and cached between runs so it is downloaded once rather than
+      # on every push.
+      - name: Cache the spaCy model
+        id: spacy-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/spacy-model
+          key: en_core_web_lg-3.8.0
+
+      - name: Install the spaCy model
+        run: python -m spacy download en_core_web_lg
+
+      - name: Run the test suite
+        run: python -m pytest tests/ -q
+
+      # The corpus is committed, and it is generated. If the generator and the
+      # committed fixtures ever disagree, every accuracy figure in the README
+      # is measuring something that is no longer in the repository.
+      - name: Check the corpus still regenerates identically
+        run: |
+          python scripts/generate_test_data.py
+          git diff --exit-code data/
+
+      - name: Score the detectors
+        run: python scripts/compare_detectors.py

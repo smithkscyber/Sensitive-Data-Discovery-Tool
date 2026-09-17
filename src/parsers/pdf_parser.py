@@ -21,14 +21,31 @@ import pdfplumber
 from src.parsers import ocr
 
 
+class EncryptedPdfError(ValueError):
+    """Raised for a password-protected PDF."""
+
+
 def extract(path: Path | str, use_ocr: bool = True) -> str:
     """Return a PDF's text, pages joined by a newline.
 
     Set ``use_ocr=False`` to read only the text layer -- useful when scanning a
     large share where the OCR cost outweighs catching scanned documents.
     """
-    with pdfplumber.open(str(path)) as document:
-        pages = [page.extract_text() or "" for page in document.pages]
+    try:
+        with pdfplumber.open(str(path)) as document:
+            pages = [page.extract_text() or "" for page in document.pages]
+    except Exception as error:
+        # pdfminer raises an exception with an empty message for a
+        # password-protected file, so the scanner would report
+        # "PdfminerException: " and leave the operator no idea what to do.
+        # An encrypted document is a real coverage gap worth naming, not a
+        # mystery failure.
+        if b"/Encrypt" in Path(path).read_bytes():
+            raise EncryptedPdfError(
+                f"{Path(path).name} is password-protected; its contents were "
+                f"not scanned"
+            ) from error
+        raise
 
     if not use_ocr:
         return "\n".join(pages)

@@ -310,4 +310,12 @@ def test_person_and_location_are_out_of_scope(report):
     These 97 values are what the Phase 4 NLP layer is for. Charging them
     against the regex engine would measure the build plan, not the code.
     """
-    assert report.out_of_scope == {"PERSON": 62, "LOCATION": 35}
+    import json
+    from pathlib import Path
+    from collections import Counter
+
+    key = json.loads(
+        (Path(__file__).resolve().parents[1] / "data" / "answer_key.json").read_text()
+    )
+    truth = Counter(f["type"] for e in key["files"] for f in e["findings"])
+    assert report.out_of_scope == {"PERSON": truth["PERSON"], "LOCATION": truth["LOCATION"]}

@@ -22,6 +22,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+from src.access import ENV_VAR, PathNotAllowed, resolve_scan_path, scan_root
 from src.detectors import hybrid, nlp_detector
 from src.parsers import SUPPORTED_EXTENSIONS
 from src.reporting.report_builder import build_findings_frame, build_summary_frame
@@ -91,6 +92,7 @@ with st.sidebar:
     else:
         folder = st.text_input("Folder path", value="data/raw")
         recursive = st.checkbox("Include subfolders", value=True)
+        st.caption(f"Confined to `{scan_root()}` (set `{ENV_VAR}` to change).")
 
     ready = bool(uploads) if source == "Upload files" else bool(folder.strip())
     label = f"Scan {len(uploads)} file{'s' if len(uploads) != 1 else ''}" if uploads else "Scan"
@@ -117,11 +119,16 @@ if run:
             if source == "Upload files":
                 st.session_state["result"] = stage_and_scan(uploads, hybrid.scan_text)
             else:
+                # Through resolve_scan_path, never straight to scan_path: this
+                # field takes a path from whoever can reach the page, and the
+                # server would otherwise read anywhere on disk.
                 st.session_state["result"] = scan_path(
-                    Path(folder.strip()), detect=hybrid.scan_text, recursive=recursive
+                    resolve_scan_path(folder.strip()),
+                    detect=hybrid.scan_text,
+                    recursive=recursive,
                 )
         st.session_state["scanned_at"] = datetime.now(timezone.utc)
-    except (FileNotFoundError, NotADirectoryError) as error:
+    except (FileNotFoundError, NotADirectoryError, PathNotAllowed) as error:
         st.session_state.pop("result", None)
         st.error(f"{error}. Check the path and try again.")
 

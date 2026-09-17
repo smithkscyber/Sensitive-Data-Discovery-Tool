@@ -61,6 +61,10 @@ ANSWER_KEY_PATH = REPO_ROOT / "data" / "answer_key.json"
 #: not rewrite every binary fixture with a fresh timestamp and a spurious diff.
 FIXED_TIMESTAMP = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
+#: The same moment as a ZIP date tuple, for the archive metadata inside a
+#: .docx. ZIP stores local time with no zone, so this is a plain 6-tuple.
+FIXED_ZIP_TIMESTAMP = (2026, 1, 1, 0, 0, 0)
+
 #: Courier 10pt on US Letter fits about 92 characters. Long lines are rejected
 #: rather than allowed to overflow the page, where the overflowing text would
 #: silently fail to extract.
@@ -419,6 +423,77 @@ def build_letter(mint: Mint, index: int) -> Fixture:
     )
 
 
+def build_contact_notice(mint: Mint, index: int) -> Fixture:
+    """Contact details only -- the corpus's LOW band.
+
+    Every other fixture carries a Social Security number, so without files
+    like this one the corpus can only ever produce HIGH and CRITICAL and three
+    of the five bands go unexercised by real data.
+    """
+    doc = Doc()
+    doc.add("FACILITIES BULLETIN\n")
+    doc.add("=" * 60 + "\n\n")
+    doc.add("The loading bay will be closed for resurfacing next week.\n")
+    doc.add("Deliveries should be rerouted to the west entrance.\n\n")
+    doc.add("Questions to the facilities desk: ")
+    doc.add_pii(EMAIL_ADDRESS, mint.email()).add("\n")
+    doc.add("Out of hours, call ").add_pii(PHONE_NUMBER, mint.phone()).add(".\n\n")
+    doc.add("No action is required from most teams.\n")
+
+    return Fixture(
+        path=RAW_DIR / f"bulletin_{index:02d}.txt",
+        text=doc.text,
+        file_format="txt",
+        findings=doc.findings,
+        decoys=doc.decoys,
+    )
+
+
+def build_site_note(mint: Mint, index: int) -> Fixture:
+    """A single address and nothing more severe -- the MEDIUM band."""
+    doc = Doc()
+    doc.add("SITE VISIT NOTE\n")
+    doc.add("=" * 60 + "\n\n")
+    doc.add("The survey was completed on schedule. The property is\n")
+    doc.add("registered at ").add_pii(LOCATION, mint.address()).add("\n")
+    doc.add("and the access code has been rotated since the last visit.\n\n")
+    doc.add("No follow-up is outstanding.\n")
+
+    return Fixture(
+        path=RAW_DIR / f"site_note_{index:02d}.txt",
+        text=doc.text,
+        file_format="txt",
+        findings=doc.findings,
+        decoys=doc.decoys,
+    )
+
+
+def build_clean_notice(mint: Mint, index: int) -> Fixture:
+    """No PII at all -- the NONE band.
+
+    A scan that never produces a clean result cannot demonstrate that it
+    distinguishes one, and "found nothing" is a verdict the tool has to be
+    able to reach correctly. Deliberately free of names, addresses and digit
+    strings: both engines must see nothing here.
+    """
+    doc = Doc()
+    doc.add("RECORDS RETENTION NOTICE\n")
+    doc.add("=" * 60 + "\n\n")
+    doc.add("All departments must review storage allocations before the end\n")
+    doc.add("of the quarter. Retention periods are unchanged this cycle.\n\n")
+    doc.add("Archived material older than seven years becomes eligible for\n")
+    doc.add("disposal once the relevant department head has signed off.\n\n")
+    doc.add("Questions should be raised through the usual channel.\n")
+
+    return Fixture(
+        path=RAW_DIR / f"retention_{index:02d}.txt",
+        text=doc.text,
+        file_format="txt",
+        findings=doc.findings,
+        decoys=doc.decoys,
+    )
+
+
 def generate() -> list[Fixture]:
     mint = Mint(SEED)
     fixtures: list[Fixture] = []
@@ -426,6 +501,11 @@ def generate() -> list[Fixture]:
     fixtures.extend(build_contact_csv(mint, i) for i in range(1, 4))
     fixtures.extend(build_contract(mint, i) for i in range(1, 4))
     fixtures.extend(build_letter(mint, i) for i in range(1, 4))
+    # Low-severity and clean fixtures, so the corpus exercises every risk band
+    # rather than leaving LOW, MEDIUM and NONE to unit tests alone.
+    fixtures.append(build_contact_notice(mint, 1))
+    fixtures.append(build_site_note(mint, 1))
+    fixtures.append(build_clean_notice(mint, 1))
     return fixtures
 
 
@@ -473,6 +553,30 @@ def verify(fixtures: list[Fixture], against: str = "text") -> None:
                 )
 
 
+def _freeze_zip_timestamps(path: Path) -> None:
+    """Rewrite a ZIP archive with fixed member timestamps.
+
+    A .docx is a ZIP, and python-docx stamps every member with the wall clock
+    at save time. The member *contents* are identical run to run, but those
+    timestamps are not, so regenerating produced a different file every time
+    and the committed corpus always looked dirty.
+
+    Setting the document's core properties is not enough -- those live inside
+    docProps/core.xml, while this is the archive's own metadata one level up.
+    """
+    import zipfile
+
+    with zipfile.ZipFile(path) as archive:
+        members = [(info, archive.read(info.filename)) for info in archive.infolist()]
+
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+        for info, data in members:
+            frozen = zipfile.ZipInfo(info.filename, date_time=FIXED_ZIP_TIMESTAMP)
+            frozen.compress_type = info.compress_type
+            frozen.external_attr = info.external_attr
+            archive.writestr(frozen, data)
+
+
 def _write_docx(path: Path, text: str) -> None:
     """One source line per Word paragraph.
 
@@ -487,6 +591,7 @@ def _write_docx(path: Path, text: str) -> None:
     document.core_properties.created = FIXED_TIMESTAMP
     document.core_properties.modified = FIXED_TIMESTAMP
     document.save(str(path))
+    _freeze_zip_timestamps(path)
 
 
 def _write_pdf(path: Path, text: str) -> None:
