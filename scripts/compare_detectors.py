@@ -40,6 +40,21 @@ def main() -> int:
             f"{title:<24}{t.precision:>12.3f}{t.recall:>10.3f}{t.f1:>10.3f}"
             f"{t.true_positives:>6}{t.false_positives:>6}{t.false_negatives:>6}"
         )
+
+    # The number that actually means something. The corpus above has been
+    # tuned against repeatedly, so a perfect score on it says only that no
+    # known failure mode remains. The held-out file was written by hand, scored
+    # once, and is never used to adjust a pattern.
+    holdout_key = Path(__file__).resolve().parents[1] / "data" / "holdout_key.json"
+    if holdout_key.exists():
+        holdout = score_corpus(hybrid.scan_text, ALL_TYPES, answer_key_path=holdout_key)
+        h = holdout.totals
+        print("-" * 72)
+        print(
+            f"{'Held-out (not tuned on)':<24}{h.precision:>12.3f}{h.recall:>10.3f}"
+            f"{h.f1:>10.3f}{h.true_positives:>6}{h.false_positives:>6}"
+            f"{h.false_negatives:>6}"
+        )
     return 0
 
 

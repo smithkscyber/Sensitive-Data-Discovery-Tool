@@ -285,23 +285,22 @@ def test_corpus_has_no_false_positives_for_structured_types(report, pii_type):
     assert report.per_type[pii_type].false_positives == 0
 
 
-def test_ip_precision_is_limited_by_decoys(report):
-    """A documented limitation, asserted so it cannot change unnoticed.
+def test_ip_version_strings_are_no_longer_flagged(report):
+    """Once the detector's last source of false positives.
 
-    Five version strings shaped like addresses are flagged as IPs. The pattern
-    is not wrong -- "10.2.14.3" is a valid address -- it simply cannot see that
-    the surrounding sentence is about a software build. Distinguishing the two
-    needs context, which is what Phase 4 adds.
+    "10.2.14.3" is a valid address and an ordinary software version, and
+    nothing about the characters separates them -- only the word in front does.
+    Suppressing a dotted quad that sits immediately after "build", "version" or
+    "firmware" closed the gap without costing any real address.
     """
     ip_score = report.per_type[IP_ADDRESS]
-    assert ip_score.false_positives == 5
+    assert ip_score.false_positives == 0
     assert ip_score.recall == 1.0
-    assert all(hit["pii_type"] == IP_ADDRESS for hit in report.decoy_hits)
 
 
-def test_no_decoy_fools_a_structured_pattern(report):
-    """Every decoy except the version strings must be correctly ignored."""
-    assert len(report.decoy_hits) == 5
+def test_no_decoy_fools_any_pattern(report):
+    """All forty near misses are correctly ignored."""
+    assert report.decoy_hits == []
 
 
 def test_person_and_location_are_out_of_scope(report):

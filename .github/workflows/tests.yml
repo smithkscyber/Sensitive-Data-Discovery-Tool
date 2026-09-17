@@ -22,10 +22,12 @@ jobs:
       - name: Install Tesseract
         run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
 
+      # The lock file, not requirements.txt: CI should build the tree the
+      # accuracy figures were measured on, not whatever resolves today.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.lock.txt
 
       # ~560MB, and cached between runs so it is downloaded once rather than
       # on every push.
@@ -50,5 +52,8 @@ jobs:
           python scripts/generate_test_data.py
           git diff --exit-code data/
 
+      # Prints the corpus scores and, last, the held-out file the detector was
+      # never tuned against -- the only number here that is evidence rather
+      # than a measurement of its own training material.
       - name: Score the detectors
         run: python scripts/compare_detectors.py

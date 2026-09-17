@@ -188,8 +188,51 @@ def find_phones(text: str) -> list[Match]:
     return _find(PHONE_PATTERN, PHONE_NUMBER, text)
 
 
+#: Words that turn a dotted quad into a version number. "10.2.14.3" is a
+#: perfectly valid address and a perfectly ordinary software version, and
+#: nothing about the characters separates the two -- only the word in front of
+#: them does. This was the detector's last remaining source of false positives.
+#:
+#: The keyword must sit *immediately* before the number, with nothing but
+#: whitespace or punctuation between. A looser window suppressed "the build
+#: server at 10.1.2.3", where "build" describes the server and the address is
+#: entirely real -- exactly the over-fitting this kind of rule invites. In a
+#: version string the number follows the word directly; in prose it does not.
+VERSION_CONTEXT_PATTERN = re.compile(
+    r"\b(?:v|ver|version|versions|build|builds|release|released|firmware|"
+    r"rev|revision|patch|sdk|driver|schema|protocol|spec|upgraded?)"
+    r"\b[ \t]*[:=#-]?[ \t]*$",
+    re.IGNORECASE,
+)
+
+#: How far back to look. Only needs to reach the keyword itself, since the
+#: pattern above anchors to the end of this window.
+VERSION_CONTEXT_WINDOW = 24
+
+
 def find_ip_addresses(text: str) -> list[Match]:
-    return _find(IP_PATTERN, IP_ADDRESS, text)
+    """Find IP addresses, minus the ones that are version numbers.
+
+    Structure cannot settle this one. Unlike a credit card, where Luhn gives a
+    second, independent signal, a dotted quad carries no checksum -- so the
+    only evidence available is the surrounding words. This is the one place the
+    regex layer reaches for context, and it is a keyword rule rather than a
+    model, so it is held to the same held-out tests the address recognizer is.
+    """
+    matches = []
+    for match in IP_PATTERN.finditer(text):
+        window = text[max(0, match.start() - VERSION_CONTEXT_WINDOW) : match.start()]
+        if VERSION_CONTEXT_PATTERN.search(window):
+            continue
+        matches.append(
+            Match(
+                IP_ADDRESS,
+                match.start(),
+                match.end(),
+                redact(IP_ADDRESS, match.group()),
+            )
+        )
+    return matches
 
 
 def find_credit_cards(text: str) -> list[Match]:

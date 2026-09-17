@@ -2,7 +2,7 @@
 
 Python based detection tool combining regex pattern matching and Microsoft Presidio's NLP engine to identify SSNs, credit card numbers, emails, phone numbers, and addresses across document sets, modeling data governance workflows used in e-discovery and compliance.
 
-> **Status:** in progress. Everything through the Streamlit UI (Phases 1–8) is complete and runs. A final documentation and dependency-freeze pass is still to come.
+> **Status:** feature-complete and tested. 374 tests, CI on every push. A final README restructure is the last item outstanding.
 
 ## Planned capabilities
 
@@ -23,8 +23,8 @@ cd Sensitive-Data-Discovery-Tool
 python -m venv venv
 source venv/bin/activate    # Windows: venv\Scripts\activate
 
-pip install -r requirements.txt
-python -m spacy download en_core_web_lg    # ~560MB language model
+pip install -r requirements.lock.txt      # or requirements.txt for looser pins
+python -m spacy download en_core_web_lg   # ~560MB language model
 ```
 
 For OCR — needed to read scanned documents and images — also install Tesseract, which is a system binary rather than a Python package:
@@ -47,11 +47,15 @@ python main.py --input data/raw --output report.csv
 ```
 Sensitive-Data-Discovery-Tool/
 ├── data/
-│   ├── raw/              # synthetic .txt/.csv/.docx/.pdf (no real PII, ever)
-│   └── answer_key.json   # ground truth: types + character offsets
+│   ├── raw/              # generated corpus (no real PII, ever)
+│   ├── holdout/          # one hand-written file, never tuned against
+│   ├── edge_cases/       # deliberately unreadable fixtures
+│   ├── answer_key.json   # ground truth: types + character offsets
+│   └── holdout_key.json  # ground truth for the held-out file
 ├── src/
+│   ├── access.py         # confines server-side scans to a scan root
 │   ├── detectors/        # regex_detector, nlp_detector, hybrid merge
-│   ├── parsers/          # text/csv/docx/pdf extraction + dispatcher
+│   ├── parsers/          # 18 formats + OCR, behind one dispatcher
 │   ├── reporting/        # risk_scorer, report_builder
 │   ├── evaluation.py     # precision/recall against the answer key
 │   ├── scanner.py        # walks a path: parse -> detect -> score
@@ -63,7 +67,8 @@ Sensitive-Data-Discovery-Tool/
 ├── tests/
 ├── app.py                # Streamlit entry point
 ├── main.py               # CLI entry point
-├── requirements.txt
+├── requirements.txt      # direct dependencies, with the reasoning
+├── requirements.lock.txt # the full resolved tree
 └── README.md
 ```
 
@@ -80,8 +85,11 @@ contacts_02.csv   csv         40    176    10  CRITICAL
 memo_02.txt       txt         12     46    10  HIGH
 contract_01.docx  docx         9     38    10  HIGH
 letter_01.pdf     pdf          7     33    10  HIGH
+site_note_01.txt  txt          1      5     5  MEDIUM
+bulletin_01.txt   txt          2      5     3  LOW
+retention_01.txt  txt          0      0     0  NONE
 ...
-14 files, 226 findings  (HIGH 11, CRITICAL 3)
+17 files, 229 findings  (NONE 1, LOW 1, MEDIUM 1, HIGH 11, CRITICAL 3)
 ```
 
 | Flag | Meaning |
@@ -203,17 +211,26 @@ Matches never carry the raw matched text, from either engine. A `Match` holds th
 ```bash
 python scripts/compare_detectors.py    # all three detectors side by side
 python scripts/score_detector.py       # regex baseline only
-python -m pytest tests/                # 337 unit + corpus tests
+python -m pytest tests/                # 374 unit + corpus tests
 ```
 
 Measured over all 17 corpus files:
 
 ```
 DETECTOR                   PRECISION    RECALL        F1    TP    FP    FN
-Regex only                     0.962     1.000     0.981   128     5     0
-Presidio NLP only              0.867     0.973     0.917   215    33     6
-Hybrid (regex + NLP)           0.978     0.991     0.985   224     5     2
+Regex only                     1.000     1.000     1.000   128     0     0
+Presidio NLP only              0.868     0.982     0.921   217    33     4
+Hybrid (regex + NLP)           1.000     1.000     1.000   226     0     0
+-------------------------------------------------------------------------
+Held-out (not tuned on)        1.000     1.000     1.000     9     0     0
 ```
+
+**Read the last row first, and treat the ones above it sceptically.** The corpus
+was tuned against across every phase of this project — patterns were adjusted
+until it scored well. A perfect score on it means *no known failure mode
+remains*, which is a weaker claim than it looks. `data/holdout/` holds one
+hand-written file that was scored once and is never used to adjust a pattern;
+that row is evidence, the rest is a detector grading its own homework.
 
 Per type, the hybrid:
 
@@ -221,16 +238,16 @@ Per type, the hybrid:
 TYPE              FOUND  ACTUAL    TP   FP   FN    PREC  RECALL      F1
 CREDIT_CARD           8       8     8    0    0   1.000   1.000   1.000
 EMAIL_ADDRESS        44      44    44    0    0   1.000   1.000   1.000
-IP_ADDRESS           10       5     5    5    0   0.500   1.000   0.667
+IP_ADDRESS            5       5     5    0    0   1.000   1.000   1.000
 LOCATION             36      36    36    0    0   1.000   1.000   1.000
-PERSON               60      62    60    0    2   1.000   0.968   0.984
+PERSON               62      62    62    0    0   1.000   1.000   1.000
 PHONE_NUMBER         36      36    36    0    0   1.000   1.000   1.000
 US_SSN               35      35    35    0    0   1.000   1.000   1.000
 ```
 
-**Read the TP column, not the F1 column.** Regex scores the highest F1 — but only because it is graded on the 126 findings it is capable of attempting, ignoring the 98 `PERSON` and `LOCATION` values it cannot see. The hybrid is measured on all 226 and finds 224 of them. Comparing F1 across detectors with different scopes compares the difficulty of the subset, not the quality of the engine.
+**Read the TP column, not the F1 column.** Regex scores the highest F1 — but only because it is graded on the 126 findings it is capable of attempting, ignoring the 98 `PERSON` and `LOCATION` values it cannot see. The hybrid is measured on all 226 and finds every one. Comparing F1 across detectors with different scopes compares the difficulty of the subset, not the quality of the engine.
 
-Against the fair comparison — NLP alone, scored on the same entity set — the merge improves **both** precision (0.867 → 0.978) and recall (0.973 → 0.991). Those gains are traceable to specific rules:
+Against the fair comparison — NLP alone, scored on the same entity set — the merge improves **both** precision (0.868 → 1.000) and recall (0.982 → 1.000). Those gains are traceable to specific rules:
 
 | Row | Effect of the merge |
 |---|---|
@@ -251,11 +268,26 @@ Plus seven hand-written real addresses (`1600 Pennsylvania Avenue NW, Washington
 
 The honest limit: the 300-address check tests generalization across address *instances*, not across address *formats*. Those are still Faker's US layout. The hand-written cases cover format variation, but seven examples is seven examples.
 
+### Two fixes that took the corpus to 1.000
+
+**Version strings that look like addresses.** `10.2.14.3` is a valid IP *and* an ordinary software version, and nothing about the characters separates them — only the word in front does. A dotted quad sitting immediately after `build`, `version`, `firmware` or `release` is now suppressed.
+
+The first attempt looked back 40 characters for any of those words, and a held-out case caught it: *"the build server at 10.1.2.3 is down"* lost a real address, because `build` described the server. Requiring the keyword to sit **immediately** before the number — nothing but whitespace or punctuation between — fixes it. In a version string the number follows the word directly; in prose it does not.
+
+**Names the model could not see.** Two real misses, two different causes:
+
+```
+"To:      Jennifer Brown <...>"   the run of padding spaces breaks the
+                                  tokenizer; with one space it is found
+"Dear Fernando Proctor,"          the model tags the first mention of a
+                                  name in a letter and not the second
+```
+
+Neither is a threshold problem — the entity scores *nothing*, so there is no confidence to raise. What both have is **position**: a name on a `To:` line or after `Dear` is a name because of where it sits. A recognizer for correspondence conventions finds them, with a stop-list so `Dear Hiring Manager` and `To: Facilities Desk` stay unflagged.
+
 ### Known limitations
 
-**Two `PERSON` values are still missed** — one in a `To:` header, one in a `Dear ...` salutation. Plain NER misses, unrelated to addresses.
-
-**`IP_ADDRESS` precision is 0.500**, unchanged from Phase 3. Presidio does not detect IPs in the configured entity set, so the merge has no second opinion to bring, and the version-string decoys still fool the pattern.
+**English-only**, **US-only addresses**, **three US phone formats** in the regex layer (the NLP layer covers more). **No `.doc`, `.pptx`, or archive recursion.** **OCR degrades on poor scans** — see above. **The UI has no authentication**; it is a local tool. Full register in the caveats section of the project notes.
 
 **These numbers are tied to the pinned versions.** Presidio's accuracy comes from a spaCy model; upgrading `en_core_web_lg` changes which entities are found and how their spans are bounded.
 
@@ -305,7 +337,7 @@ using the OLD offsets against the converted file:
 
 The CSV shifted too (+5 to +28 characters), which is the less obvious half: it is easy to anticipate that PDF mangles layout and forget that flattening a table does the same thing.
 
-Detection accuracy is **unchanged** after the conversion — precision 0.978, recall 0.991, exactly as in Phase 4. That is the point. The corpus got harder to read; the offsets were re-derived correctly; the numbers held.
+Detection accuracy was **unchanged** by the conversion — identical precision and recall before and after. That is the point. The corpus got harder to read; the offsets were re-derived correctly; the numbers held.
 
 ## Risk scoring and reporting
 

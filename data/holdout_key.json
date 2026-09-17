@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "purpose": "A held-out evaluation file, hand-written rather than generated. The main corpus was tuned against repeatedly, so a perfect score on it only means no known failure mode remains. This file was written once, scored once, and is never used to adjust a pattern -- which is the only way its number means anything.",
+  "contents": {
+    "document": "insurance claim letter",
+    "pii": [
+      "CREDIT_CARD",
+      "EMAIL_ADDRESS",
+      "IP_ADDRESS",
+      "LOCATION",
+      "PERSON",
+      "PHONE_NUMBER",
+      "US_SSN"
+    ],
+    "decoys": [
+      "CREDIT_CARD",
+      "IP_ADDRESS",
+      "US_SSN"
+    ],
+    "finding_count": 9,
+    "decoy_count": 3,
+    "note": "The first scoring run reported a PERSON false positive on 'Mr. Whitfield' in the salutation. It was not a false positive -- that is a real person reference and a scanner should flag it; this hand-written key had simply omitted it. The key was corrected, the detector was not touched. Recorded here because a held-out number is only worth something if the way it was arrived at is visible."
+  },
+  "files": [
+    {
+      "path": "data/holdout/insurance_claim_letter.txt",
+      "format": "txt",
+      "findings": [
+        {
+          "type": "PERSON",
+          "start": 123,
+          "end": 139,
+          "value": "Marcus Whitfield"
+        },
+        {
+          "type": "LOCATION",
+          "start": 140,
+          "end": 178,
+          "value": "1420 Lakeview Terrace, Boise, ID 83702"
+        },
+        {
+          "type": "PERSON",
+          "start": 185,
+          "end": 198,
+          "value": "Mr. Whitfield"
+        },
+        {
+          "type": "PHONE_NUMBER",
+          "start": 466,
+          "end": 480,
+          "value": "(208) 555-0147"
+        },
+        {
+          "type": "EMAIL_ADDRESS",
+          "start": 563,
+          "end": 586,
+          "value": "m.whitfield@example.com"
+        },
+        {
+          "type": "US_SSN",
+          "start": 687,
+          "end": 698,
+          "value": "512-84-7391"
+        },
+        {
+          "type": "CREDIT_CARD",
+          "start": 798,
+          "end": 817,
+          "value": "4666 1760 3137 2159"
+        },
+        {
+          "type": "IP_ADDRESS",
+          "start": 881,
+          "end": 893,
+          "value": "10.14.203.66"
+        },
+        {
+          "type": "PERSON",
+          "start": 1077,
+          "end": 1087,
+          "value": "Donna Ruiz"
+        }
+      ],
+      "decoys": [
+        {
+          "near_miss_for": "US_SSN",
+          "start": 289,
+          "end": 298,
+          "value": "418027365",
+          "reason": "claim reference: nine digits, no separators"
+        },
+        {
+          "near_miss_for": "CREDIT_CARD",
+          "start": 722,
+          "end": 738,
+          "value": "5957117777412154",
+          "reason": "policy account: sixteen digits, fails Luhn"
+        },
+        {
+          "near_miss_for": "IP_ADDRESS",
+          "start": 980,
+          "end": 988,
+          "value": "12.4.0.1",
+          "reason": "software build number in dotted-quad form"
+        }
+      ]
+    }
+  ]
+}

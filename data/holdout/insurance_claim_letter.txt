@@ -1,0 +1,33 @@
+MERIDIAN MUTUAL INSURANCE
+Claims Correspondence Unit
+--------------------------------------------------------------
+
+Attn: Marcus Whitfield
+1420 Lakeview Terrace, Boise, ID 83702
+
+Dear Mr. Whitfield,
+
+Thank you for reporting the water damage at the property above.
+Your claim reference is 418027365 and has been assigned to the
+adjuster named below. Please quote that reference, not your
+policy number, in any further correspondence.
+
+We were unable to reach you on (208) 555-0147 last Thursday.
+If a daytime number would be better, reply to this letter or
+email m.whitfield@example.com and we will update the file.
+
+For identity verification our records show the Social Security
+number 512-84-7391 and the policy account 5957117777412154.
+The deductible was settled on the card ending below:
+
+    4666 1760 3137 2159
+
+Our field inspector reached the property management portal at
+10.14.203.66 to confirm the meter reading. Their report notes
+the claims platform is running build 12.4.0.1, which does not
+support the new photograph upload, so images were emailed.
+
+Sincerely,
+
+Donna Ruiz
+Senior Claims Adjuster

@@ -263,13 +263,11 @@ def test_end_to_end_counts_match_the_answer_key(full_scan):
     for result in full_scan.scored:
         found.update(result.counts)
 
-    for pii_type in ("US_SSN", "CREDIT_CARD", "EMAIL_ADDRESS", "PHONE_NUMBER", "LOCATION"):
-        assert found[pii_type] == truth[pii_type], pii_type
-
-    # Two PERSON values the NER misses: a To: header and a Dear salutation.
-    assert found["PERSON"] == truth["PERSON"] - 2
-    # Five planted version strings that look exactly like IP addresses.
-    assert found["IP_ADDRESS"] == truth["IP_ADDRESS"] + 5
+    # Every type exact. Earlier this test carried two documented deltas -- a
+    # PERSON shortfall on a padded "To:" header and a Dear salutation, and an
+    # IP_ADDRESS excess on planted version strings. Both were closed by
+    # recognisers that read position and context rather than shape.
+    assert found == truth
 
 
 def test_end_to_end_scans_all_four_formats(full_scan):

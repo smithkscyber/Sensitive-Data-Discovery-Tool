@@ -109,6 +109,108 @@ def build_address_recognizer():
     )
 
 
+# --------------------------------------------------------------------------
+# Correspondents: names the NER misses because of where they sit
+# --------------------------------------------------------------------------
+#
+# Two real misses on this corpus, with two different causes:
+#
+#   "To:      Jennifer Brown <...>"  the run of padding spaces breaks the
+#                                    tokenizer; with one space it is found
+#   "Dear Fernando Proctor,"         the model tags the first mention of a
+#                                    name in a letter and not the second
+#
+# Neither is fixable by tuning a threshold -- the entity scores nothing at
+# all, so there is no confidence to raise. What both cases do have is
+# position: a name on a "To:" line or after "Dear" is a name because of where
+# it sits, not because of what it looks like. That is a pattern, and it is the
+# same move the address recognizer makes.
+
+#: A capitalised token that can form part of a name.
+_NAME_TOKEN = r"[A-Z][A-Za-z'\u2019.-]+"
+
+#: Two to four capitalised tokens: a first and last name, allowing a middle
+#: name or a suffix. One token is too loose -- "To: Facilities" is a desk.
+_FULL_NAME = rf"{_NAME_TOKEN}(?:[ \t]+{_NAME_TOKEN}){{1,3}}"
+
+CORRESPONDENT_PATTERNS = (
+    # A correspondence header, with any amount of padding after the colon.
+    rf"(?:^|\n)[ \t]*(?:To|From|Cc|Bcc|Attn|Attention)[ \t]*:[ \t]*(?P<target>{_FULL_NAME})",
+    # A salutation.
+    rf"\bDear[ \t]+(?P<target>{_FULL_NAME})",
+)
+
+#: Words that make a capitalised phrase a role or a department rather than a
+#: person. "Dear Hiring Manager" and "To: Facilities Desk" both look exactly
+#: like a name to the pattern above, and neither is one.
+NON_PERSON_TOKENS = frozenset(
+    {
+        "sir", "madam", "customer", "customers", "client", "colleague",
+        "colleagues", "team", "all", "everyone", "manager", "hiring",
+        "recruiter", "desk", "department", "support", "admin", "administrator",
+        "owner", "resident", "occupant", "member", "members", "valued",
+        "friend", "user", "subscriber", "whom", "concerned", "services",
+        "office", "committee", "board", "group", "staff", "payroll",
+    }
+)
+
+#: Below the NER's 0.85. This recognizer is a positional inference, not an
+#: observation about the characters, so where the model does have an opinion
+#: its own should carry more weight.
+CORRESPONDENT_SCORE = 0.6
+
+
+def looks_like_a_person(name: str) -> bool:
+    """Reject capitalised phrases that name a role rather than a person."""
+    return not any(token.lower() in NON_PERSON_TOKENS for token in name.split())
+
+
+def build_correspondent_recognizer():
+    """Report the *name* in a header or salutation, not the whole line.
+
+    Presidio's PatternRecognizer returns ``match.span()``, which here would
+    include the "Dear " or "To: " that identified the name in the first place.
+    A recognizer that tagged the prefix would report a span the report then
+    quotes back with punctuation in it, and would overlap-suppress a correct
+    NER span sitting inside it. So this one reports a named capture group.
+    """
+    import re
+
+    from presidio_analyzer import EntityRecognizer, RecognizerResult
+
+    class CorrespondentRecognizer(EntityRecognizer):
+        def __init__(self) -> None:
+            super().__init__(
+                supported_entities=[PERSON], name="CorrespondentRecognizer"
+            )
+            self._patterns = [
+                re.compile(pattern) for pattern in CORRESPONDENT_PATTERNS
+            ]
+
+        def load(self) -> None:  # required by the interface; nothing to load
+            return None
+
+        def analyze(self, text, entities, nlp_artifacts=None):
+            if PERSON not in entities:
+                return []
+            results = []
+            for pattern in self._patterns:
+                for match in pattern.finditer(text):
+                    start, end = match.span("target")
+                    if looks_like_a_person(text[start:end]):
+                        results.append(
+                            RecognizerResult(
+                                entity_type=PERSON,
+                                start=start,
+                                end=end,
+                                score=CORRESPONDENT_SCORE,
+                            )
+                        )
+            return results
+
+    return CorrespondentRecognizer()
+
+
 @lru_cache(maxsize=1)
 def get_analyzer():
     """Build the Presidio engine once and reuse it.
@@ -127,6 +229,7 @@ def get_analyzer():
 
     analyzer = AnalyzerEngine()
     analyzer.registry.add_recognizer(build_address_recognizer())
+    analyzer.registry.add_recognizer(build_correspondent_recognizer())
     return analyzer
 
 

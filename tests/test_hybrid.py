@@ -214,11 +214,16 @@ def test_merge_is_what_clears_the_person_false_positives(reports):
     assert reports["hybrid"].per_type[PERSON].false_positives == 0
 
 
-def test_hybrid_has_no_false_positives_outside_the_ip_decoys(reports):
-    """The only remaining false positives are the documented version strings."""
-    totals = reports["hybrid"].totals
-    assert totals.false_positives == 5
-    assert all(hit["pii_type"] == "IP_ADDRESS" for hit in reports["hybrid"].decoy_hits)
+def test_hybrid_has_no_false_positives(reports):
+    """Nothing in the corpus is flagged that should not be.
+
+    Worth reading with the caveat attached: this corpus has been tuned against
+    across every phase, so a clean sheet here means no *known* failure mode
+    remains. The number that is evidence rather than self-assessment is the
+    held-out file, scored in test_holdout.py.
+    """
+    assert reports["hybrid"].totals.false_positives == 0
+    assert reports["hybrid"].decoy_hits == []
 
 
 # ------------------------------------- validated evidence beats a long guess
