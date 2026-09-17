@@ -1,20 +1,31 @@
-# Versions are pinned so the synthetic corpus in data/raw/ stays byte-identical
-# across machines and over time. The answer key records character offsets, which
-# are only valid for the exact text Faker produced -- an unpinned upgrade would
+# Versions are pinned so the synthetic corpus in data/raw/ stays stable across
+# machines and over time. The answer key records character offsets, which are
+# only valid for the exact text Faker produced -- an unpinned upgrade would
 # silently invalidate every offset. Upgrade deliberately, then regenerate the
 # corpus and the key together.
+#
+# .txt and .csv fixtures are byte-identical run to run. The .docx and .pdf
+# fixtures carry fixed metadata timestamps, but their compressed bytes may
+# still vary with library version; what is guaranteed stable is the text their
+# parsers extract, which is what the offsets index.
 #
 # The same reasoning applies to the NLP stack: Presidio's accuracy comes from a
 # spaCy model, and a model upgrade changes which entities are found and how
 # their spans are bounded. Every precision/recall figure in the README is tied
 # to these exact versions.
 #
-# Later phases add pdfplumber, python-docx, and streamlit.
+# Later phases add streamlit.
 faker==40.39.0
 pandas==3.0.5
 presidio-analyzer==2.2.364
 presidio-anonymizer==2.2.364
 spacy==3.8.16
+pdfplumber==0.11.10
+python-docx==1.2.0
+
+# Writes the .pdf fixtures in scripts/generate_test_data.py. Not needed to run
+# the scanner -- only to regenerate the corpus.
+fpdf2==2.8.8
 
 # The language model is not on PyPI. After installing the above, run:
 #     python -m spacy download en_core_web_lg

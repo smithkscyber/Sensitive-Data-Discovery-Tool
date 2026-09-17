@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterable, Sequence
 
+from src.parsers import parse
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ANSWER_KEY = REPO_ROOT / "data" / "answer_key.json"
 
@@ -172,7 +174,10 @@ def score_corpus(
     report = ScoreReport()
 
     for entry in key["files"]:
-        text = (REPO_ROOT / entry["path"]).read_text(encoding="utf-8")
+        # Via parse(), never read_text(): the answer key's offsets index parsed
+        # text, and half the corpus is now binary. Reading bytes here would
+        # both crash on .docx and silently mismatch on .csv.
+        text = parse(REPO_ROOT / entry["path"])
         gold = [f for f in entry["findings"] if f["type"] in scoreable]
         for finding in entry["findings"]:
             if finding["type"] not in scoreable:

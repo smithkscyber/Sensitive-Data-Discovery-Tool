@@ -2,7 +2,7 @@
 
 Python based detection tool combining regex pattern matching and Microsoft Presidio's NLP engine to identify SSNs, credit card numbers, emails, phone numbers, and addresses across document sets, modeling data governance workflows used in e-discovery and compliance.
 
-> **Status:** in progress. Scaffold (Phase 1), synthetic corpus and answer key (Phase 2), regex baseline (Phase 3), and hybrid regex+NLP detection (Phase 4) are complete; multi-format parsing, risk scoring, CLI, and UI are still being built.
+> **Status:** in progress. Scaffold (Phase 1), synthetic corpus and answer key (Phase 2), regex baseline (Phase 3), hybrid regex+NLP detection (Phase 4), and multi-format parsing (Phase 5) are complete; risk scoring, CLI, and UI are still being built.
 
 ## Planned capabilities
 
@@ -38,12 +38,11 @@ python main.py
 ```
 Sensitive-Data-Discovery-Tool/
 ├── data/
-│   ├── raw/              # synthetic test files (no real PII, ever)
-│   ├── pending/          # source text for docx/pdf fixtures (Phase 5)
+│   ├── raw/              # synthetic .txt/.csv/.docx/.pdf (no real PII, ever)
 │   └── answer_key.json   # ground truth: types + character offsets
 ├── src/
 │   ├── detectors/        # regex_detector, nlp_detector, hybrid merge
-│   ├── parsers/          # per-format text extraction
+│   ├── parsers/          # text/csv/docx/pdf extraction + dispatcher
 │   ├── reporting/        # risk scoring and report building
 │   └── evaluation.py     # precision/recall against the answer key
 ├── scripts/
@@ -89,7 +88,7 @@ Matches never carry the raw matched text, from either engine. A `Match` holds th
 ```bash
 python scripts/compare_detectors.py    # all three detectors side by side
 python scripts/score_detector.py       # regex baseline only
-python -m pytest tests/                # 118 unit + corpus tests
+python -m pytest tests/                # 175 unit + corpus tests
 ```
 
 Measured over all 14 corpus files:
@@ -97,7 +96,7 @@ Measured over all 14 corpus files:
 ```
 DETECTOR                   PRECISION    RECALL        F1    TP    FP    FN
 Regex only                     0.962     1.000     0.981   126     5     0
-Presidio NLP only              0.862     0.977     0.916   213    34     5
+Presidio NLP only              0.866     0.977     0.918   213    33     5
 Hybrid (regex + NLP)           0.978     0.991     0.984   221     5     2
 ```
 
@@ -116,15 +115,15 @@ US_SSN               35      35    35    0    0   1.000   1.000   1.000
 
 **Read the TP column, not the F1 column.** Regex scores the highest F1 — but only because it is graded on the 126 findings it is capable of attempting, ignoring the 97 `PERSON` and `LOCATION` values it cannot see. The hybrid is measured on all 223 and finds 221 of them. Comparing F1 across detectors with different scopes compares the difficulty of the subset, not the quality of the engine.
 
-Against the fair comparison — NLP alone, scored on the same entity set — the merge improves **both** precision (0.862 → 0.978) and recall (0.977 → 0.991). Those gains are traceable to specific rules:
+Against the fair comparison — NLP alone, scored on the same entity set — the merge improves **both** precision (0.866 → 0.978) and recall (0.977 → 0.991). Those gains are traceable to specific rules:
 
 | Row | Effect of the merge |
 |---|---|
 | `CREDIT_CARD` | Presidio finds 6 of 8; regex finds all 8, and authority keeps them → recall 0.750 → 1.000 |
 | `PHONE_NUMBER` | Presidio contributes 6 false positives; regex authority drops them → precision 0.850 → 1.000 |
-| `PERSON` | Presidio emits 28 spurious spans inside addresses; the longest-span rule discards them → precision 0.682 → 1.000 |
+| `PERSON` | Presidio emits 27 spurious spans inside addresses; the longest-span rule discards them → precision 0.690 → 1.000 |
 
-That `PERSON` row is the clearest argument for having a merge layer at all. **Neither piece fixes it alone.** Presidio still emits all 28 spurious spans even with the address recognizer installed — it does not reconcile its own overlapping opinions. What removes them is the combination: the recognizer supplies a full-address span, and the merge then treats a `PERSON` sitting inside one as a fragment of it.
+That `PERSON` row is the clearest argument for having a merge layer at all. **Neither piece fixes it alone.** Presidio still emits all 27 spurious spans even with the address recognizer installed — it does not reconcile its own overlapping opinions. What removes them is the combination: the recognizer supplies a full-address span, and the merge then treats a `PERSON` sitting inside one as a fragment of it.
 
 ### Guarding against over-fitting
 
@@ -149,6 +148,43 @@ The honest limit: the 300-address check tests generalization across address *ins
 
 The phone patterns cover three formats because the corpus contains three. Real-world phone detection also faces country codes, extensions, and international formats. Recall of 1.000 here means "found everything in a corpus built from these formats", not "solved phone detection".
 
+## Parsing
+
+`src/parsers/` extracts text per format and dispatches on extension:
+
+| Format | Extractor | Round-trip fidelity |
+|---|---|---|
+| `.txt` | direct read | Exact |
+| `.csv` | `pandas`, flattened to text | Lossless, but reflowed |
+| `.docx` | `python-docx`, paragraphs + tables | Exact |
+| `.pdf` | `pdfplumber`, page by page | **Lossy** — blank lines disappear |
+
+An unknown extension raises rather than returning `""`. Silence would make an unreadable file indistinguishable from a clean one, which is the most dangerous result this tool can produce.
+
+### The invariant: offsets index parsed text, not bytes
+
+Every offset in the answer key is derived by running the finished file back through the same `parse()` the scanner uses. This matters because for three of the four formats, the text on disk is not the text a detector sees:
+
+```
+FILE                FMT    RAW BYTES   PARSED CHARS
+memo_01.txt         txt          731            731     identical
+contacts_01.csv     csv         1051           1079     quotes dropped, cells rejoined
+contract_01.docx    docx       37104            755     a ZIP of XML
+letter_01.pdf       pdf         1489            682     blank lines gone
+```
+
+A PDF stores glyphs at coordinates, not text. Extraction reconstructs reading order from positions — and a blank line paints nothing, so it leaves nothing to find. Had the source offsets been kept, every one would have been wrong:
+
+```
+using the OLD offsets against the converted file:
+  [  53:69  ] expected 'Fernando Proctor'    got 'ernando Proctor\n'    WRONG
+  [ 126:142 ] expected 'Fernando Proctor'    got 'rnando Proctor,\n'    WRONG
+```
+
+The CSV shifted too (+5 to +28 characters), which is the less obvious half: it is easy to anticipate that PDF mangles layout and forget that flattening a table does the same thing.
+
+Detection accuracy is **unchanged** after the conversion — precision 0.978, recall 0.991, exactly as in Phase 4. That is the point. The corpus got harder to read; the offsets were re-derived correctly; the numbers held.
+
 ## Test data and the answer key
 
 All test data is synthetic, generated with [Faker](https://faker.readthedocs.io/). No real personal data is used in this repository — not in commits, not in test fixtures, not in examples. Generated email addresses use only RFC 2606 reserved domains (`example.com` and friends), so no address can reach a real mailbox.
@@ -161,8 +197,7 @@ python scripts/generate_test_data.py
 
 | Path | Contents |
 |---|---|
-| `data/raw/` | 5 `.txt` memos and 3 `.csv` contact lists — scannable today |
-| `data/pending/` | Source text for 3 `.docx` contracts and 3 `.pdf` letters, converted to their real formats in Phase 5 |
+| `data/raw/` | 5 `.txt` memos, 3 `.csv` contact lists, 3 `.docx` contracts, 3 `.pdf` letters |
 | `data/answer_key.json` | Ground truth: every planted value, its type, and its character offsets |
 
 ### Why the answer key records offsets
@@ -178,6 +213,8 @@ The corpus deliberately plants values that *resemble* PII but are not sensitive 
 ### Determinism
 
 The generator is seeded, and `requirements.txt` pins exact versions. Faker reproduces the same fake people only within a given version — an unpinned upgrade would change the generated text, shift every offset, and invalidate the key. Upgrade deliberately, then regenerate the corpus and key together.
+
+`.txt` and `.csv` fixtures are byte-identical run to run. The `.docx` and `.pdf` fixtures carry fixed metadata timestamps so regenerating does not produce spurious diffs, but their compressed bytes are not guaranteed identical across library versions. What *is* guaranteed stable is the text their parsers extract — which is what the offsets index, and what the `text_sha256` in the key hashes.
 
 The generator refuses to write a corpus it cannot verify: it asserts every recorded span holds the value it claims, that no spans overlap, and that no planted value appears in the text more times than it was recorded.
 

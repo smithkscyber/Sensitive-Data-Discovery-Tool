@@ -15,15 +15,20 @@ two properties matter more than realism:
    entry in the answer key -- otherwise a correct detection would be scored as
    a false positive in Phase 3.
 
+**Offsets index parsed text, not file bytes.** Every offset in the answer key
+is re-derived by running the finished file back through ``src.parsers.parse``
+-- the same function the scanner uses. For .txt the two are identical; for
+.csv, .docx and .pdf they are not, and recording source offsets for those would
+describe text the scanner never sees.
+
 Usage::
 
     python scripts/generate_test_data.py
 
 Writes::
 
-    data/raw/       .txt memos and .csv contact lists, ready to scan today
-    data/pending/   source text for the .docx and .pdf fixtures, converted to
-                    their real formats in Phase 5
+    data/raw/       5 .txt memos, 3 .csv contact lists, 3 .docx contracts,
+                    3 .pdf letters
     data/answer_key.json
 """
 
@@ -34,10 +39,15 @@ import json
 import random
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 import faker
 from faker import Faker
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from src.parsers import parse  # noqa: E402  (needs the path insert above)
 
 # Changing the seed regenerates the entire corpus and invalidates every offset
 # already recorded in the answer key. Change it only alongside a full rerun.
@@ -45,8 +55,16 @@ SEED = 20260916
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = REPO_ROOT / "data" / "raw"
-PENDING_DIR = REPO_ROOT / "data" / "pending"
 ANSWER_KEY_PATH = REPO_ROOT / "data" / "answer_key.json"
+
+#: Stamped into .docx and .pdf metadata instead of "now", so regenerating does
+#: not rewrite every binary fixture with a fresh timestamp and a spurious diff.
+FIXED_TIMESTAMP = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+#: Courier 10pt on US Letter fits about 92 characters. Long lines are rejected
+#: rather than allowed to overflow the page, where the overflowing text would
+#: silently fail to extract.
+PDF_MAX_LINE = 90
 
 # Entity labels match Presidio's vocabulary so Phase 4 can compare its output
 # against this key without a translation layer.
@@ -121,7 +139,8 @@ class Fixture:
     file_format: str
     findings: list[dict] = field(default_factory=list)
     decoys: list[dict] = field(default_factory=list)
-    target_format: str | None = None
+    #: Filled in after the file is written, by re-reading it through parse().
+    parsed_text: str = ""
 
 
 class Mint:
@@ -348,12 +367,11 @@ def build_contract(mint: Mint, index: int) -> Fixture:
     doc.add("Contact: ").add_pii(EMAIL_ADDRESS, mint.email()).add("\n")
 
     return Fixture(
-        path=PENDING_DIR / f"contract_{index:02d}.txt",
+        path=RAW_DIR / f"contract_{index:02d}.docx",
         text=doc.text,
-        file_format="txt",
+        file_format="docx",
         findings=doc.findings,
         decoys=doc.decoys,
-        target_format="docx",
     )
 
 
@@ -393,12 +411,11 @@ def build_letter(mint: Mint, index: int) -> Fixture:
     doc.add("Member Services\n")
 
     return Fixture(
-        path=PENDING_DIR / f"letter_{index:02d}.txt",
+        path=RAW_DIR / f"letter_{index:02d}.pdf",
         text=doc.text,
-        file_format="txt",
+        file_format="pdf",
         findings=doc.findings,
         decoys=doc.decoys,
-        target_format="pdf",
     )
 
 
@@ -412,19 +429,24 @@ def generate() -> list[Fixture]:
     return fixtures
 
 
-def verify(fixtures: list[Fixture]) -> None:
+def verify(fixtures: list[Fixture], against: str = "text") -> None:
     """Prove every recorded span actually points at the value it claims.
 
     This is the check that makes the answer key trustworthy. If it ever fails,
     the key is lying and every accuracy number derived from it is meaningless.
+
+    Run twice: once against the text the builder produced, which catches
+    template bugs, and again against the text ``parse()`` returns from the
+    written file, which catches anything the format conversion moved.
     """
     for fixture in fixtures:
+        subject = getattr(fixture, against)
         spans = [
             (item["start"], item["end"], item["value"])
             for item in (*fixture.findings, *fixture.decoys)
         ]
         for start, end, value in spans:
-            actual = fixture.text[start:end]
+            actual = subject[start:end]
             if actual != value:
                 raise AssertionError(
                     f"{fixture.path.name}: span [{start}:{end}] holds "
@@ -441,7 +463,7 @@ def verify(fixtures: list[Fixture]) -> None:
         # interpolated into a template, say. An unrecorded value would be
         # scored as a false positive in Phase 3 and quietly depress precision.
         for _, _, value in spans:
-            in_text = fixture.text.count(value)
+            in_text = subject.count(value)
             recorded = sum(1 for _, _, other in spans if other == value)
             if in_text != recorded:
                 raise AssertionError(
@@ -451,11 +473,97 @@ def verify(fixtures: list[Fixture]) -> None:
                 )
 
 
+def _write_docx(path: Path, text: str) -> None:
+    """One source line per Word paragraph.
+
+    python-docx round-trips this exactly: the text read back out is identical
+    to the text put in, blank lines included.
+    """
+    import docx
+
+    document = docx.Document()
+    for line in text.split("\n"):
+        document.add_paragraph(line)
+    document.core_properties.created = FIXED_TIMESTAMP
+    document.core_properties.modified = FIXED_TIMESTAMP
+    document.save(str(path))
+
+
+def _write_pdf(path: Path, text: str) -> None:
+    """Draw each source line at a fixed position in a monospace font.
+
+    Nothing here survives as text the way it was written. A PDF stores glyphs
+    at coordinates, and extraction reconstructs lines from those positions, so
+    the round trip is lossy by construction -- blank lines vanish entirely,
+    because a line with no characters paints nothing on the page.
+
+    Lines wider than the page would be clipped and silently lost, so an
+    over-long line is a hard error rather than a quiet gap in the corpus.
+    """
+    from fpdf import FPDF
+
+    lines = text.split("\n")
+    too_long = [line for line in lines if len(line) > PDF_MAX_LINE]
+    if too_long:
+        raise ValueError(
+            f"{path.name}: {len(too_long)} line(s) exceed {PDF_MAX_LINE} "
+            f"characters and would be clipped off the page"
+        )
+
+    pdf = FPDF(format="letter", unit="pt")
+    pdf.set_creation_date(FIXED_TIMESTAMP)
+    pdf.set_auto_page_break(auto=False)
+    pdf.add_page()
+    pdf.set_font("Courier", size=10)
+    for line in lines:
+        pdf.cell(0, 12, line, new_x="LMARGIN", new_y="NEXT")
+    pdf.output(str(path))
+
+
+WRITERS = {
+    "txt": lambda path, text: path.write_text(text, encoding="utf-8", newline="\n"),
+    "csv": lambda path, text: path.write_text(text, encoding="utf-8", newline="\n"),
+    "docx": _write_docx,
+    "pdf": _write_pdf,
+}
+
+
 def write_corpus(fixtures: list[Fixture]) -> None:
     RAW_DIR.mkdir(parents=True, exist_ok=True)
-    PENDING_DIR.mkdir(parents=True, exist_ok=True)
     for fixture in fixtures:
-        fixture.path.write_text(fixture.text, encoding="utf-8", newline="\n")
+        WRITERS[fixture.file_format](fixture.path, fixture.text)
+
+
+def relocate_offsets(fixtures: list[Fixture]) -> None:
+    """Re-derive every offset against what ``parse()`` returns.
+
+    The builder knows where it put each value in the text it composed. That is
+    not where the value ends up in the text a parser extracts back out: a PDF
+    drops blank lines, and the CSV parser flattens quoted cells into prose. An
+    offset recorded against the source would point into text no detector will
+    ever be handed.
+
+    Values are located in document order behind a forward-moving cursor, which
+    is what keeps a name that appears three times mapped to its three distinct
+    positions rather than to the first one three times.
+    """
+    for fixture in fixtures:
+        fixture.parsed_text = parse(fixture.path)
+        ordered = sorted(
+            (*fixture.findings, *fixture.decoys), key=lambda item: item["start"]
+        )
+        cursor = 0
+        for item in ordered:
+            found = fixture.parsed_text.find(item["value"], cursor)
+            if found < 0:
+                raise AssertionError(
+                    f"{fixture.path.name}: a planted value recorded at "
+                    f"{item['start']} did not survive the round trip through "
+                    f"{fixture.file_format} -- extraction altered or dropped it"
+                )
+            item["start"] = found
+            item["end"] = found + len(item["value"])
+            cursor = item["end"]
 
 
 def build_answer_key(fixtures: list[Fixture]) -> dict:
@@ -465,20 +573,11 @@ def build_answer_key(fixtures: list[Fixture]) -> dict:
             "path": fixture.path.relative_to(REPO_ROOT).as_posix(),
             "format": fixture.file_format,
             "text_sha256": hashlib.sha256(
-                fixture.text.encode("utf-8")
+                fixture.parsed_text.encode("utf-8")
             ).hexdigest(),
             "findings": sorted(fixture.findings, key=lambda f: f["start"]),
             "decoys": sorted(fixture.decoys, key=lambda d: d["start"]),
         }
-        if fixture.target_format:
-            entry["pending_conversion"] = {
-                "target_format": fixture.target_format,
-                "note": (
-                    "Offsets are valid for this source text. Converting to "
-                    f"{fixture.target_format} changes the extracted layout, so "
-                    "Phase 5 must re-derive offsets against the extracted text."
-                ),
-            }
         files.append(entry)
 
     totals: dict[str, int] = {}
@@ -496,8 +595,11 @@ def build_answer_key(fixtures: list[Fixture]) -> dict:
         },
         "conventions": {
             "offsets": (
-                "Character indices into the UTF-8 decoded file text, "
-                "half-open [start, end), matching Python slicing and re spans."
+                "Character indices into the text src.parsers.parse() returns "
+                "for the file -- not into the file's bytes. Half-open "
+                "[start, end), matching Python slicing and re spans. The two "
+                "differ for csv, docx and pdf, so offsets are re-derived from "
+                "parsed text after each file is written."
             ),
             "values": (
                 "Included because scoring needs them and every value here is "
@@ -513,7 +615,10 @@ def build_answer_key(fixtures: list[Fixture]) -> dict:
             ),
             "determinism": (
                 "No wall-clock timestamp is recorded, so this file changes "
-                "only when the corpus itself changes."
+                "only when the corpus itself changes. The .docx and .pdf "
+                "fixtures carry a fixed metadata timestamp for the same "
+                "reason, though their compressed bytes are not guaranteed "
+                "identical across library versions; their parsed text is."
             ),
         },
         "summary": {
@@ -528,8 +633,10 @@ def build_answer_key(fixtures: list[Fixture]) -> dict:
 
 def main() -> int:
     fixtures = generate()
-    verify(fixtures)
+    verify(fixtures, against="text")       # the builder composed it correctly
     write_corpus(fixtures)
+    relocate_offsets(fixtures)             # ...and it survived the file format
+    verify(fixtures, against="parsed_text")
 
     answer_key = build_answer_key(fixtures)
     ANSWER_KEY_PATH.write_text(
@@ -537,15 +644,17 @@ def main() -> int:
     )
 
     summary = answer_key["summary"]
-    pending = sum(1 for f in fixtures if f.target_format)
-    print(f"Wrote {summary['file_count']} files")
-    print(f"  data/raw/      {len(fixtures) - pending} scannable now")
-    print(f"  data/pending/  {pending} awaiting Phase 5 conversion")
+    by_format: dict[str, int] = {}
+    for fixture in fixtures:
+        by_format[fixture.file_format] = by_format.get(fixture.file_format, 0) + 1
+    print(f"Wrote {summary['file_count']} files to data/raw/")
+    for file_format, count in sorted(by_format.items()):
+        print(f"  .{file_format:<5} {count}")
     print(f"Recorded {summary['finding_count']} findings, {summary['decoy_count']} decoys")
     for pii_type, count in summary["findings_by_type"].items():
         print(f"  {pii_type:<16} {count:>3}")
     print(f"Answer key: {ANSWER_KEY_PATH.relative_to(REPO_ROOT)}")
-    print("All spans verified against the generated text.")
+    print("All spans verified against parsed text, per format.")
     return 0
 
 

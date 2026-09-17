@@ -194,8 +194,8 @@ def test_address_recognizer_makes_location_exact(reports):
 def test_merge_is_what_clears_the_person_false_positives(reports):
     """Neither the recognizer nor the merge fixes PERSON precision alone.
 
-    Presidio still emits 28 spurious PERSON spans -- Faker builds street and
-    city names out of personal names ("Darren Locks", "West Bianca"), and the
+    Presidio still emits dozens of spurious PERSON spans -- Faker builds street
+    and city names out of personal names ("Darren Locks", "West Bianca"), and the
     NER reads them as people. Adding the address recognizer does not stop it
     doing that; Presidio does not reconcile its own overlapping opinions.
 
@@ -203,8 +203,14 @@ def test_merge_is_what_clears_the_person_false_positives(reports):
     address span, and the merge's longest-span rule then treats the PERSON
     sitting inside it as a fragment. That is the whole argument for having a
     merge layer rather than trusting one engine's output.
+
+    Asserted as a relationship rather than an exact count. The NLP figure is
+    currently 27 and moves for reasons unrelated to this behaviour -- it was 28
+    until the CSV parser started stripping quotes, which changed one NER
+    decision. Pinning it would turn an unrelated parser change into a failure
+    here, while a bound still fails loudly if the merge stops doing its job.
     """
-    assert reports["nlp"].per_type[PERSON].false_positives == 28
+    assert reports["nlp"].per_type[PERSON].false_positives >= 20
     assert reports["hybrid"].per_type[PERSON].false_positives == 0
 
 
