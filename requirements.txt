@@ -14,7 +14,6 @@
 # their spans are bounded. Every precision/recall figure in the README is tied
 # to these exact versions.
 #
-# Later phases add streamlit.
 faker==40.39.0
 pandas==3.0.5
 presidio-analyzer==2.2.364
@@ -26,6 +25,12 @@ python-docx==1.2.0
 # Writes the .pdf fixtures in scripts/generate_test_data.py. Not needed to run
 # the scanner -- only to regenerate the corpus.
 fpdf2==2.8.8
+
+# UI. altair comes with streamlit but is pinned because app.py imports it
+# directly for the findings chart -- st.bar_chart orders categories
+# alphabetically and cannot be told to sort by value.
+streamlit==1.64.0
+altair==6.3.0
 
 # The language model is not on PyPI. After installing the above, run:
 #     python -m spacy download en_core_web_lg

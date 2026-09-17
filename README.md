@@ -2,7 +2,7 @@
 
 Python based detection tool combining regex pattern matching and Microsoft Presidio's NLP engine to identify SSNs, credit card numbers, emails, phone numbers, and addresses across document sets, modeling data governance workflows used in e-discovery and compliance.
 
-> **Status:** in progress. Everything through the end-to-end CLI (Phases 1–7) is complete and runs. The Streamlit UI and final documentation pass are still to come.
+> **Status:** in progress. Everything through the Streamlit UI (Phases 1–8) is complete and runs. A final documentation and dependency-freeze pass is still to come.
 
 ## Planned capabilities
 
@@ -45,7 +45,8 @@ Sensitive-Data-Discovery-Tool/
 │   ├── parsers/          # text/csv/docx/pdf extraction + dispatcher
 │   ├── reporting/        # risk_scorer, report_builder
 │   ├── evaluation.py     # precision/recall against the answer key
-│   └── scanner.py        # walks a path: parse -> detect -> score
+│   ├── scanner.py        # walks a path: parse -> detect -> score
+│   └── uploads.py        # stages uploaded files, then deletes them
 ├── scripts/
 │   ├── generate_test_data.py
 │   ├── score_detector.py
@@ -82,6 +83,20 @@ letter_01.pdf     pdf          7     33    10  HIGH
 | `--quiet`, `-q` | Write reports without printing the table |
 
 Two reports are written: `report.csv` (one row per file, triage order) and `report.findings.csv` beside it (one row per file and PII type).
+
+### Web UI
+
+```bash
+streamlit run app.py
+```
+
+Two ways in, one code path behind them: **drag files onto the uploader**, or point it at a folder on the machine running the app. Both call `scanner.scan_path()` — no detection logic lives in the UI, so the CLI and the web app can never disagree about what the tool found.
+
+The results view carries the same four metrics as the CLI summary, a per-file table with the band colour-coded, a findings-by-type chart, and CSV/JSON downloads. Unreadable files get their own section rather than being dropped.
+
+**Uploads never persist.** Streamlit hands over bytes in memory while every parser needs a real path, so uploads are written to a `TemporaryDirectory` that is removed when the scan returns — including when it raises. A tool whose job is finding sensitive data should not be the reason copies of it accumulate in `/tmp`. Result rows are relabelled with the original filenames, so a report names the file you dropped rather than a temp path, and never discloses the server's filesystem layout.
+
+That staging logic lives in `src/uploads.py`, not in `app.py`: it has a contract worth testing, and a Streamlit script cannot be imported outside a Streamlit runtime.
 
 ### Three outcomes, all reported
 
@@ -160,7 +175,7 @@ Matches never carry the raw matched text, from either engine. A `Match` holds th
 ```bash
 python scripts/compare_detectors.py    # all three detectors side by side
 python scripts/score_detector.py       # regex baseline only
-python -m pytest tests/                # 255 unit + corpus tests
+python -m pytest tests/                # 273 unit + corpus tests
 ```
 
 Measured over all 14 corpus files:

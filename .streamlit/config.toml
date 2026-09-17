@@ -1,0 +1,8 @@
+# Keeps `streamlit run app.py` from prompting for an email on first launch and
+# from trying to phone home for usage stats -- neither is wanted from a tool
+# that people will point at sensitive documents.
+[browser]
+gatherUsageStats = false
+
+[server]
+headless = true
