@@ -138,9 +138,21 @@ def redact(pii_type: str, value: str) -> str:
     """
     if pii_type == EMAIL_ADDRESS and "@" in value:
         local, _, domain = value.partition("@")
+        # A one-character local part has no tail to mask, so keeping its first
+        # letter would keep all of it: "a@example.org" would redact to itself.
+        # Drop the initial in that case rather than reveal the whole address.
+        if len(local) < 2:
+            return f"{'*' * len(local)}@{domain}"
         return f"{local[0]}{'*' * (len(local) - 1)}@{domain}"
     if pii_type == IP_ADDRESS:
         octets = value.split(".")
+        # Fail closed. Every value that reaches here by way of IP_PATTERN is a
+        # dotted quad, so octets[:2] discards half of it -- but a redaction
+        # that relies on its caller having validated the input first is a
+        # redaction that leaks the day a new caller appears. Given "10.0" this
+        # returned "10.0.x.x", which reveals the value in full.
+        if len(octets) != 4:
+            return "*" * len(value)
         return ".".join(octets[:2] + ["x"] * 2)
     if pii_type == "PERSON":
         # Initials are enough to correlate two findings about the same person
@@ -155,10 +167,17 @@ def redact(pii_type: str, value: str) -> str:
     if pii_type in (US_SSN, CREDIT_CARD, PHONE_NUMBER):
         # Keep the last four digits and every separator; mask the rest, so the
         # shape of the value survives but its content does not.
+        #
+        # "Keep the last four" only conceals anything when there are more than
+        # four to begin with. An SSN has nine and a card sixteen, so on every
+        # real path there are five or twelve digits to mask -- but given a
+        # short value this rule masked nothing at all and returned it intact.
+        # Below the threshold, mask the lot.
+        reveal = 4 if sum(char.isdigit() for char in value) > 4 else 0
         kept = 0
         out = []
         for char in reversed(value):
-            if char.isdigit() and kept < 4:
+            if char.isdigit() and kept < reveal:
                 out.append(char)
                 kept += 1
             elif char.isdigit():

@@ -74,6 +74,21 @@ class TypeScore:
 
 
 @dataclass
+class SpanOutcome:
+    """Which gold findings were missed and which predictions were spurious.
+
+    Returned by ``score_spans`` so a caller can attribute a miss to whatever it
+    knows about that finding -- the benchmark uses it to report *which kind of
+    placeholder* went unfound. Derived from the same greedy matching that
+    produced the counts, so a diagnostic can never disagree with the score it
+    is explaining.
+    """
+
+    missed: list[int] = field(default_factory=list)
+    spurious: list[object] = field(default_factory=list)
+
+
+@dataclass
 class ScoreReport:
     per_type: dict[str, TypeScore] = field(default_factory=dict)
     decoy_hits: list[dict] = field(default_factory=list)
@@ -101,7 +116,7 @@ def score_spans(
     decoys: Sequence[dict],
     report: ScoreReport,
     source: str,
-) -> None:
+) -> SpanOutcome:
     """Match predictions to gold findings and fold the result into ``report``.
 
     Greedy by overlap size: each prediction claims the best unclaimed gold
@@ -109,6 +124,7 @@ def score_spans(
     sprawling across two adjacent values would be credited twice.
     """
     unclaimed = list(range(len(gold)))
+    outcome = SpanOutcome()
 
     for prediction in predictions:
         best_index = None
@@ -132,6 +148,7 @@ def score_spans(
             continue
 
         score.false_positives += 1
+        outcome.spurious.append(prediction)
         # A false positive landing on a planted decoy is worth calling out by
         # name: it says which near miss fooled the detector, not just that
         # something did.
@@ -155,6 +172,8 @@ def score_spans(
             missed["type"], TypeScore(missed["type"])
         )
         score.false_negatives += 1
+    outcome.missed = list(unclaimed)
+    return outcome
 
 
 def score_corpus(

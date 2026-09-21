@@ -17,6 +17,10 @@
 #
 # Tesseract is a system binary, installed separately -- see the README.
 #
+# mutmut is deliberately absent. It is an audit tool, not part of the tool or
+# its tests, and it drags in libcst, textual and playwright -- a far larger
+# tree than the thing it measures. Install it on demand:  pip install mutmut
+#
 # Regenerate with:  pip freeze > requirements.lock.txt
 Faker==40.39.0
 Jinja2==3.1.6
@@ -48,6 +52,7 @@ h11==0.16.0
 httpcore==1.0.9
 httptools==0.8.0
 httpx==0.28.1
+hypothesis==6.168.0
 idna==3.19
 iniconfig==2.3.0
 itsdangerous==2.2.0
@@ -91,6 +96,7 @@ rpds-py==2026.6.3
 shellingham==1.5.4
 six==1.17.0
 smart_open==8.0.1
+sortedcontainers==2.4.0
 spacy-legacy==3.0.12
 spacy-loggers==1.0.5
 spacy==3.8.16

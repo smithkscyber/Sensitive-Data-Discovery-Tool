@@ -50,6 +50,7 @@ Sensitive-Data-Discovery-Tool/
 │   ├── raw/              # generated corpus (no real PII, ever)
 │   ├── holdout/          # one hand-written file, never tuned against
 │   ├── edge_cases/       # deliberately unreadable fixtures
+│   ├── external/         # third-party benchmark data, vendored verbatim
 │   ├── answer_key.json   # ground truth: types + character offsets
 │   └── holdout_key.json  # ground truth for the held-out file
 ├── src/
@@ -57,14 +58,17 @@ Sensitive-Data-Discovery-Tool/
 │   ├── detectors/        # regex_detector, nlp_detector, hybrid merge
 │   ├── parsers/          # 18 formats + OCR, behind one dispatcher
 │   ├── reporting/        # risk_scorer, report_builder
+│   ├── benchmark.py      # renders the third-party benchmark, with offsets
 │   ├── evaluation.py     # precision/recall against the answer key
 │   ├── scanner.py        # walks a path: parse -> detect -> score
 │   └── uploads.py        # stages uploaded files, then deletes them
 ├── scripts/
 │   ├── generate_test_data.py
 │   ├── score_detector.py
-│   └── compare_detectors.py
+│   ├── compare_detectors.py
+│   └── benchmark_external.py
 ├── tests/
+├── setup.cfg             # mutation-testing configuration
 ├── app.py                # Streamlit entry point
 ├── main.py               # CLI entry point
 ├── requirements.txt      # direct dependencies, with the reasoning
@@ -211,7 +215,8 @@ Matches never carry the raw matched text, from either engine. A `Match` holds th
 ```bash
 python scripts/compare_detectors.py    # all three detectors side by side
 python scripts/score_detector.py       # regex baseline only
-python -m pytest tests/                # 374 unit + corpus tests
+python -m pytest tests/                # 431 unit, corpus and property tests
+python scripts/benchmark_external.py   # third-party data, not ours
 ```
 
 Measured over all 17 corpus files:
@@ -231,6 +236,11 @@ until it scored well. A perfect score on it means *no known failure mode
 remains*, which is a weaker claim than it looks. `data/holdout/` holds one
 hand-written file that was scored once and is never used to adjust a pattern;
 that row is evidence, the rest is a detector grading its own homework.
+
+One hand-written file is thin evidence, though, so the next section measures
+the same detectors against 1,045 sentences built from templates and identities
+this project did not write. **That is the number to judge the tool by:
+precision 0.927, recall 0.816.**
 
 Per type, the hybrid:
 
@@ -256,6 +266,179 @@ Against the fair comparison — NLP alone, scored on the same entity set — the
 | `PERSON` | Presidio emits 27 spurious spans inside addresses; the longest-span rule discards them → precision 0.690 → 1.000 |
 
 That `PERSON` row is the clearest argument for having a merge layer at all. **Neither piece fixes it alone.** Presidio still emits all 27 spurious spans even with the address recognizer installed — it does not reconcile its own overlapping opinions. What removes them is the combination: the recognizer supplies a full-address span, and the merge then treats a `PERSON` sitting inside one as a fragment of it.
+
+### Measured against third-party data
+
+```bash
+python scripts/benchmark_external.py            # both regions, all detectors
+python scripts/benchmark_external.py --detail   # plus the worst templates
+```
+
+The corpus above was written by the same person who wrote the detectors, so a
+perfect score on it proves the code does what it was built to do and not much
+more. `data/external/` holds two files from Microsoft's `presidio-research`
+project, vendored verbatim with checksums: **209 sentence templates** and
+**3,000 fabricated identities**. Neither was consulted while the detectors were
+written, and nothing is ever tuned against them — the moment a pattern is
+adjusted to raise a number measured here, this stops being a held-out test.
+
+1,045 sentences, 1,428 labelled entities, 444 unlabelled distractors
+(company names, job titles, URLs, IBANs — a hit on one of those is charged as
+a false positive):
+
+```
+DETECTOR                   PRECISION    RECALL        F1    TP    FP    FN
+Regex only                     1.000     1.000     1.000   225     0     0
+Presidio NLP only              0.877     0.791     0.832  1121   157   297
+Hybrid (regex + NLP)           0.927     0.816     0.868  1165    92   263
+```
+
+The regex row is graded on the 225 findings it can attempt and ignores the
+1,203 names and places it cannot see, so its 1.000 is a statement about
+difficulty, not quality — the same caveat as on the corpus table above.
+
+Two things survive contact with somebody else's sentences:
+
+- **The structured types hold at 1.000 across the board.** SSNs, card numbers,
+  emails, phone numbers and IP addresses score exactly as they do on the
+  corpus, because their formats are defined by external standards — a Luhn
+  checksum and SSA issuance rules do not care who wrote the sentence around
+  them.
+- **The merge still earns its place.** Against the fair comparison, it takes
+  `CREDIT_CARD` recall from 0.642 to 1.000 (regex authority reinstates the 34
+  cards Presidio's confidence threshold dropped), `PHONE_NUMBER` precision from
+  0.909 to 1.000, and `PERSON` precision from 0.836 to 0.893.
+
+What does *not* survive is the perfect score. `PERSON` falls to 0.893/0.832 and
+`LOCATION` to 0.933/0.728. The breakdown says exactly why:
+
+| What it is looking at | Recall | Found |
+|---|---|---|
+| Complete US address (`123 Main St, Springfield, IL 62704`) | **1.000** | 160/160 |
+| Card number, SSN, email, phone, IP | **1.000** | 225/225 |
+| Country name | **1.000** | 80/80 |
+| Full name in prose (`Contact Marika Szûts about…`) | 0.939 | 155/165 |
+| Surname alone | 0.861 | 68/79 |
+| Street line of a block address | 0.440 | 22/50 |
+| City name alone | 0.679 | 91/134 |
+| Bare ZIP code | 0.000 | 0/15 |
+| Apartment or unit number (`Apt. 511`) | 0.000 | 0/35 |
+
+**The pattern is structure.** Where a value carries its own evidence — a
+checksum, a fixed layout, a comma-state-ZIP tail — detection is exact and
+transfers unchanged to text nobody here wrote. Where the only evidence is
+context, accuracy tracks how much context there is: a name in a sentence is
+found 94% of the time, a surname on its own 86%, a ZIP code sitting alone on a
+line never. A block mailing address is the hard case precisely because the line
+breaks strip the structure out of it:
+
+```
+Marika Szûts
+1481 Maud Street          <- found alone 44% of the time
+Apt. 511                  <- never found
+Wilmington                <- found 68% of the time
+United States 19801
+```
+
+The same address on one line is found every time. Nothing about the words
+changed; only the punctuation holding them together did.
+
+False positives concentrate just as narrowly: **39 of 92 land on company
+names**, which a person-name model has every reason to read as people —
+`Wilson's Jewelers` and `White Hen Pantry` are not obviously organisations to a
+statistical tagger. Bare ZIPs and apartment numbers are counted strictly here
+even though the tool never claimed them; excluding them would raise `LOCATION`
+recall from 0.728 to 0.803, and pretending they are out of scope after seeing the
+result is how benchmarks get gamed.
+
+#### The scope probe
+
+The same 209 templates, filled from the **non-US** identities in the same file:
+
+```
+TYPE              PREC  RECALL   |  US rows, for comparison
+LOCATION         0.855   0.382   |  0.933 / 0.728
+PHONE_NUMBER     0.918   0.562   |  1.000 / 1.000
+US_SSN           1.000   0.000   |  1.000 / 1.000
+CREDIT_CARD      1.000   1.000   |  1.000 / 1.000
+-------------------------------------------------------
+ALL              0.817   0.639   |  0.927 / 0.816
+```
+
+This is not a defect, it is the documented scope arriving as a number. The SSN
+pattern encodes US issuance rules, the address recognizer expects
+`City, ST 12345`, the phone pattern expects a North American number — so
+Cypriot postcodes and six-digit Greenlandic phone numbers are missed by design.
+Credit cards and emails are unaffected, because those formats are
+international to begin with. The row worth noticing is `PERSON` precision
+falling from 0.893 to 0.757: the model is less certain about names it has seen
+less often, and it resolves that uncertainty by guessing more.
+
+### Testing the tests
+
+Accuracy figures measure the detectors. Two other techniques measure whether
+the *tests* would notice if the detectors broke.
+
+**Property-based testing** (`tests/test_properties.py`, hypothesis). Instead of
+asserting behaviour on chosen examples, each test states something that must
+hold for every input of some shape and lets the library hunt for a
+counterexample, shrinking any it finds to the smallest failing case. The
+properties are the ones where a violation would be a real defect: offsets
+always address the text, the merge never emits overlapping spans, a
+structurally validated finding is never discarded by a weaker one (the Phase 6
+bug, stated as an invariant rather than an anecdote), every Luhn-valid card is
+found and no Luhn-invalid one is reported, and `repr()` on a finding never
+prints the value it found.
+
+It found two leaks in the redaction code on the first run:
+
+```
+redact(EMAIL_ADDRESS, "a@example.org")  ->  "a@example.org"
+redact(US_SSN,        "12-34")          ->  "12-34"
+```
+
+A one-character mailbox has no tail to mask, and "keep the last four digits"
+conceals nothing when there are only four. Neither is reachable from the corpus
+— every fixture has a longer mailbox and a nine-digit SSN — and neither would
+ever have been written as an example test, because the whole point is that
+nobody thought of them. Both now fail closed.
+
+**Mutation testing** (`setup.cfg`, mutmut). Breaks the code on purpose — flips
+a comparison, deletes a guard, swaps an operator — and re-runs the tests
+against each broken version. A mutant the tests still pass is a line nothing is
+actually checking.
+
+```
+152 mutants of src/detectors/regex_detector.py
+142 killed, 10 survived  ->  93.4%
+```
+
+The first run scored 69.7%, and the 46 survivors were a to-do list. Among them:
+`continue` became `break` in the overlap loop, so every finding after the first
+rejected one vanished, and the tests did not care. `<` became `<=` in the
+overlap test, which would silently drop the second of any two adjacent values —
+two comma-separated emails in a CSV row. `US_SSN: 0` became `1`, erasing the
+tie-break that makes an SSN outrank a card number on an equal-length overlap.
+None is a bug; all three are lines whose correctness nothing was checking,
+which amounts to the same thing. Eighteen tests were added to close them, each
+naming the mutant that motivated it.
+
+The remaining ten are documented rather than chased, because they are
+unkillable or not worth killing:
+
+| Survivor | Why it stays |
+|---|---|
+| `total += value` → `-=` in Luhn | `(-t) % 10 == 0` exactly when `t % 10 == 0` — arithmetically equivalent |
+| `value > 9` → `>= 9` in Luhn | Doubled digits are always even, so 9 never occurs |
+| `CREDIT_CARD: 1` → `2` (and three more) | Shifts one priority value while preserving the ordering |
+| `"LOCATION"` → a different literal | The branch falls through to a fallback that returns the same thing |
+| `VERSION_CONTEXT_WINDOW = 24` → `25` | A tuning constant; a test pinning its exact value would make it untunable |
+| Two `repr()` format literals | Cosmetic — the invariant that matters, that the value never appears, is a property test |
+
+Scope is the honest part of this figure: it covers the regex detector, not the
+Presidio one. Scoring the NLP layer this way would reload a 560MB language
+model once per mutant. That half is covered by the corpus score, the external
+benchmark, and mutations run by hand during development.
 
 ### Guarding against over-fitting
 
@@ -287,13 +470,15 @@ Neither is a threshold problem — the entity scores *nothing*, so there is no c
 
 ### Known limitations
 
-**English-only**, **US-only addresses**, **three US phone formats** in the regex layer (the NLP layer covers more). **No `.doc`, `.pptx`, or archive recursion.** **OCR degrades on poor scans** — see above. **The UI has no authentication**; it is a local tool. Full register in the caveats section of the project notes.
+**English-only**, **US-only addresses**, **three US phone formats** in the regex layer (the NLP layer covers more) — the scope probe above puts numbers on all three. **No `.doc`, `.pptx`, or archive recursion.** **OCR degrades on poor scans** — see above. **The UI has no authentication**; it is a local tool. Full register in the caveats section of the project notes.
 
 **These numbers are tied to the pinned versions.** Presidio's accuracy comes from a spaCy model; upgrading `en_core_web_lg` changes which entities are found and how their spans are bounded.
 
 ### What these numbers do not mean
 
-The phone patterns cover three formats because the corpus contains three. Real-world phone detection also faces country codes, extensions, and international formats. Recall of 1.000 here means "found everything in a corpus built from these formats", not "solved phone detection".
+The phone patterns cover three formats because the corpus contains three. Real-world phone detection also faces country codes, extensions, and international formats. Recall of 1.000 there means "found everything in a corpus built from these formats", not "solved phone detection" — and the scope probe shows what that is worth: the same patterns recall 0.562 on non-US numbers.
+
+The third-party figures are better evidence but still not a field measurement. The sentences are synthetic, the identities are fabricated, and the two files were chosen because they existed and were redistributable, not because they represent any particular organisation's documents. What they establish is narrower and worth stating exactly: **the detectors were not fitted to the text they are scored on.** Real documents bring scanning artefacts, inconsistent formatting, domain jargon and file types this tool does not open at all.
 
 ## Parsing
 
