@@ -81,7 +81,7 @@ Third Party Data:
     - Street Address (Represented as a number corresponding to a block): .440
     - ZIP Code: .000
     - Explanation: From the data above, a few things stick out. The program does very well when the structure of the data follows a general format. When that format is changed in any way then the data is not as easily flagged by the program. For example, when the street address format was changed from 1481 Maud Street, Wilmington, DE 19801 to 1481 Maud Street the recall rating was severely impacted. Meaning the address detector was trained on a specific format rather than a dynamic search.
-    - F1: .868
+- F1: .868
 
 This is data the model was not trained on and simulates the program being utilized in a real world enviroment. This breakdown is the useful assertion as to how accurate the program is. 
 
