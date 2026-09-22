@@ -57,3 +57,12 @@ jobs:
       # than a measurement of its own training material.
       - name: Score the detectors
         run: python scripts/compare_detectors.py
+
+      # Third-party data: sentence templates and identities this project did
+      # not write, so the numbers are not a detector grading its own homework.
+      # Reported, never gated. A pass/fail threshold here would be an
+      # invitation to tune against a held-out set, which is exactly what the
+      # benchmark exists to avoid -- its integrity is gated instead, by the
+      # checksums in tests/test_benchmark.py.
+      - name: Benchmark against third-party data
+        run: python scripts/benchmark_external.py

@@ -25,7 +25,6 @@ Step 4: Scoring system that measures potential damage
 Step 5: Ranked Report
     Files are ranked by severity to determine which ones should be treated as priority
 
-
 # Search Method
 
 There are different methods this project interprets PII data in a file. There is the actual data that is resembled in numbers, names, and information; then there is the context in which it is given
@@ -118,4 +117,3 @@ However, sheer volume can impact the severity of a document. For example, a docu
 - Streamlit: web interface framwork
 - pytest: testing framework
 - Github: Version control and program housing
-

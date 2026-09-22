@@ -49,3 +49,19 @@ openpyxl==3.1.5
 
 # Development
 pytest==9.1.1
+
+# Property-based testing. tests/test_properties.py states invariants -- offsets
+# address the text, the merge never emits overlapping spans, a redaction never
+# leaks -- and hypothesis goes looking for inputs that break them, shrinking any
+# counterexample to the smallest one that still fails. It found two: a
+# one-character mailbox that redacted to itself, and a short value that "keep
+# the last four" left untouched.
+hypothesis==6.168.0
+
+# Mutation testing. Scores the test suite rather than the code by breaking the
+# detectors on purpose and checking the tests notice. Configured in setup.cfg;
+# not needed to run or test the tool, only to audit how much the tests are
+# really checking -- which is why it is the one package deliberately left out
+# of requirements.lock.txt. It pulls in libcst, textual and playwright, a far
+# larger tree than the thing it measures. Install it only when auditing.
+mutmut==2.5.1
